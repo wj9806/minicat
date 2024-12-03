@@ -1,0 +1,9 @@
+${AnsiColor.BRIGHT_BLUE}
+  __  __ _      _ ____      _   
+ |  \/  (_)_ _ (_) ___|__ _| |_ 
+ | |\/| | | ' \| | |   / _` |  _|
+ | |  | | | || | | |__| (_| | |_ 
+ |_|  |_|_|_||_|_|\____\__,_|\__|
+${AnsiColor.BRIGHT_GREEN}
+:: MiniCat ::  (v1.0.0)
+${AnsiColor.DEFAULT}
