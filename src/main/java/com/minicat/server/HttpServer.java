@@ -6,12 +6,12 @@ import com.minicat.server.thread.MinicatThreadPool;
 import com.minicat.util.BannerPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.ServletRegistration;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,11 +21,11 @@ public class HttpServer {
     private int port;
     private String contextPath;
     private String staticPath;
-    private Map<String, HttpServlet> servletMap = new HashMap<>();
     private ThreadPoolExecutor threadPool;
     private ServerConfig config;
     private volatile boolean running = false;
-    
+    private ServletContext servletContext;
+
     public HttpServer() {
         config = ServerConfig.getInstance();
         if (config.isShowBanner()) {
@@ -37,7 +37,7 @@ public class HttpServer {
         if (config.isThreadPoolEnabled()) {
             initThreadPool();
         }
-        initServlets();
+        this.servletContext = new ServletContext(contextPath, staticPath);
     }
     
     private void initThreadPool() {
@@ -61,17 +61,12 @@ public class HttpServer {
         
         // 设置executor引用，使队列可以访问到线程池的信息
         taskQueue.setExecutor(threadPool);
-        
+
         // 允许核心线程超时
         threadPool.allowCoreThreadTimeOut(true);
-        
+
         // 预启动所有核心线程
         threadPool.prestartAllCoreThreads();
-    }
-    
-    private void initServlets() {
-        StaticResourceServlet staticServlet = new StaticResourceServlet(staticPath);
-        servletMap.put("/*", staticServlet);
     }
     
     public HttpServer(int port) {
@@ -82,13 +77,13 @@ public class HttpServer {
     public void start() throws Exception {
         logger.info("Server is starting...");
         running = true;
-        
+
         // 打印启动信息
         printStartupInfo();
-        
+
         // 注册关闭钩子
         registerShutdownHook();
-        
+
         // 启动服务器并处理请求
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             while (running) {
@@ -107,7 +102,7 @@ public class HttpServer {
     private void printStartupInfo() {
         logger.info("=====>>>minicat start on port: {}", port);
         logger.info("=====>>>context path: {}", contextPath);
-        
+
         if (config.isThreadPoolEnabled()) {
             logger.info("=====>>>thread pool: enabled, core={}, max={}, queueSize={}", 
                     config.getThreadPoolCoreSize(),
@@ -142,7 +137,7 @@ public class HttpServer {
                 }
             }
         };
-        
+
         if (config.isThreadPoolEnabled()) {
             threadPool.execute(task);
         } else {
@@ -153,7 +148,7 @@ public class HttpServer {
     public void shutdown() {
         logger.info("Shutting down server...");
         running = false;
-        
+
         if (config.isThreadPoolEnabled() && threadPool != null) {
             threadPool.shutdown();
             try {
@@ -171,7 +166,7 @@ public class HttpServer {
     private void processRequest(Socket socket) throws Exception {
         InputStream inputStream = socket.getInputStream();
         OutputStream outputStream = socket.getOutputStream();
-        
+
         // 解析HTTP请求
         StringBuilder requestBuilder = new StringBuilder();
         byte[] buffer = new byte[1024];
@@ -182,7 +177,7 @@ public class HttpServer {
                 break;
             }
         }
-        
+
         String request = requestBuilder.toString();
         String[] lines = request.split("\r\n");
         if (lines.length > 0) {
@@ -204,17 +199,14 @@ public class HttpServer {
                     return;
                 }
 
-                // 移除context-path
-                if (!contextPath.isEmpty()) {
-                    uri = uri.substring(contextPath.length());
-                }
-
                 // 创建Request和Response对象
                 HttpServletRequest servletRequest = new HttpServletRequest(method, uri, protocol);
+                servletRequest.setServletContext(servletContext);
                 HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
+                servletResponse.setServletContext(servletContext);
 
                 // 查找匹配的Servlet
-                HttpServlet servlet = findMatchingServlet(uri);
+                HttpServlet servlet = servletContext.findMatchingServlet(uri);
                 if (servlet != null) {
                     try {
                         servlet.service(servletRequest, servletResponse);
@@ -234,29 +226,21 @@ public class HttpServer {
         }
     }
 
-    private HttpServlet findMatchingServlet(String uri) {
-        // 先查找精确匹配的Servlet
-        HttpServlet servlet = servletMap.get(uri);
-        if (servlet != null) {
-            return servlet;
+    public void addServlet(String url, HttpServlet servlet) {
+        String className = servlet.getClass().getSimpleName();
+        String servletName = "servlet_" + className;
+        
+        // 尝试添加 servlet
+        ServletRegistration.Dynamic registration = servletContext.addServlet(servletName, servlet);
+        if (registration == null) {
+            // 如果返回 null，说明该名称已存在
+            logger.warn("Failed to add servlet: name='{}', class='{}', url='{}'", servletName, className, url);
+            return;
         }
 
-        // 如果没有精确匹配，查找通配符Servlet
-        for (Map.Entry<String, HttpServlet> entry : servletMap.entrySet()) {
-            String pattern = entry.getKey();
-            if (pattern.endsWith("/*")) {
-                String prefix = pattern.substring(0, pattern.length() - 2);
-                if (uri.startsWith(prefix)) {
-                    return entry.getValue();
-                }
-            }
-        }
+        logger.info("Adding servlet: name='{}', class='{}', url='{}'", servletName, className, url);
 
-        return null;
-    }
-    
-    public void addServlet(String url, HttpServlet servlet) throws Exception {
-        servlet.init();
-        servletMap.put(url, servlet);
+        // 添加映射
+        registration.addMapping(url);
     }
 }

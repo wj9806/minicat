@@ -30,7 +30,7 @@ public class MinicatThreadPool extends ThreadPoolExecutor {
     @Override
     protected void beforeExecute(Thread t, Runnable r) {
         super.beforeExecute(t, r);
-        logger.debug("Thread {} is about to execute task", t.getName());
+        logger.trace("Thread {} is about to execute task", t.getName());
     }
 
     @Override
@@ -39,14 +39,14 @@ public class MinicatThreadPool extends ThreadPoolExecutor {
         if (t != null) {
             logger.error("Task execution failed", t);
         } else {
-            logger.debug("Task execution completed successfully");
+            logger.trace("Task execution completed successfully");
         }
     }
 
     @Override
     protected void terminated() {
         super.terminated();
-        logger.info("Thread pool has been terminated");
+        logger.info("Minicat Thread pool has been terminated");
     }
 
     /**

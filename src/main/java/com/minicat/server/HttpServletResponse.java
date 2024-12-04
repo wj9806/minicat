@@ -14,10 +14,15 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     private Map<String, List<String>> headers = new HashMap<>();
     private boolean committed = false;
     private ByteArrayOutputStream bodyBuffer;
+    private ServletContext servletContext;
 
     public HttpServletResponse(OutputStream outputStream) {
         this.outputStream = outputStream;
         this.bodyBuffer = new ByteArrayOutputStream();
+    }
+
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
     }
 
     private void checkCommitted() {

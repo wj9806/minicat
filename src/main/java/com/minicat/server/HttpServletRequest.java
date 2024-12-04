@@ -10,16 +10,19 @@ import java.util.*;
 
 public class HttpServletRequest implements javax.servlet.http.HttpServletRequest {
     private String method;
+    private String uri;
     private String protocol;
     private String requestURI;
     private String queryString;
     private Map<String, String> headers = new HashMap<>();
     private Map<String, String[]> parameters = new HashMap<>();
     private String characterEncoding = "UTF-8";
+    private ServletContext servletContext;
 
     public HttpServletRequest(String method, String requestURI, String protocol) {
         this.method = method;
         this.protocol = protocol;
+        this.uri = requestURI;
         
         // Parse URI and query string
         if (requestURI.contains("?")) {
@@ -52,6 +55,10 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
                 parameters.put(key, newValues);
             }
         }
+    }
+
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
     }
 
     @Override
@@ -135,7 +142,9 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public String getPathTranslated() { return null; }
 
     @Override
-    public String getContextPath() { return ""; }
+    public String getContextPath() {
+        return servletContext.getContextPath();
+    }
 
     @Override
     public String getRemoteUser() { return null; }
@@ -234,7 +243,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     @Override
     public ServletContext getServletContext() {
-        return null;
+        return servletContext;
     }
 
     @Override
