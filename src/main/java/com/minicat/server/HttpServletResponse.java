@@ -8,7 +8,7 @@ import java.util.*;
 public class HttpServletResponse implements javax.servlet.http.HttpServletResponse {
     private PrintWriter writer;
     private OutputStream outputStream;
-    private String characterEncoding = "UTF-8";
+    private String characterEncoding;
     private String contentType = "text/html";
     private int status = SC_OK;
     private Map<String, List<String>> headers = new HashMap<>();
@@ -85,7 +85,9 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     @Override
     public PrintWriter getWriter() throws IOException {
         if (writer == null) {
-            writer = new PrintWriter(new OutputStreamWriter(bodyBuffer, characterEncoding), true);
+            writer = new PrintWriter(characterEncoding == null
+                    ? new OutputStreamWriter(bodyBuffer)
+                    : new OutputStreamWriter(bodyBuffer, characterEncoding), true);
         }
         return writer;
     }

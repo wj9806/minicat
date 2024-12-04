@@ -42,9 +42,13 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         
         String[] pairs = queryString.split("&");
         for (String pair : pairs) {
+            if (pair.trim().isEmpty()) {
+                continue;
+            }
+            
             String[] keyValue = pair.split("=", 2);
-            String key = keyValue[0];
-            String value = keyValue.length > 1 ? keyValue[1] : "";
+            String key = decodeUrlParameter(keyValue[0]);
+            String value = keyValue.length > 1 ? decodeUrlParameter(keyValue[1]) : "";
             
             String[] values = parameters.get(key);
             if (values == null) {
@@ -54,6 +58,14 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
                 newValues[values.length] = value;
                 parameters.put(key, newValues);
             }
+        }
+    }
+    
+    private String decodeUrlParameter(String value) {
+        try {
+            return java.net.URLDecoder.decode(value, characterEncoding);
+        } catch (Exception e) {
+            return value;
         }
     }
 

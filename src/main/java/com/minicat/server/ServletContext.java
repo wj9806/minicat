@@ -36,8 +36,14 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
             uri = uri.substring(contextPath.length());
         }
 
+        // 移除查询参数
+        String path = uri;
+        if (path.contains("?")) {
+            path = path.substring(0, path.indexOf("?"));
+        }
+
         // 首先尝试精确匹配
-        String servletName = servletUrlPatterns.get(uri);
+        String servletName = servletUrlPatterns.get(path);
         if (servletName != null) {
             return servletMap.get(servletName);
         }
@@ -45,7 +51,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         // 然后尝试路径匹配
         for (Map.Entry<String, String> entry : servletUrlPatterns.entrySet()) {
             String pattern = entry.getKey();
-            if (pattern.endsWith("/*") && uri.startsWith(pattern.substring(0, pattern.length() - 2))) {
+            if (pattern.endsWith("/*") && path.startsWith(pattern.substring(0, pattern.length() - 2))) {
                 return servletMap.get(entry.getValue());
             }
         }

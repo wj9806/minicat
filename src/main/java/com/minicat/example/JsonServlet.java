@@ -28,7 +28,7 @@ public class JsonServlet extends HttpServlet {
         
         // 创建示例数据
         Map<String, Object> data = new HashMap<>();
-        data.put("message", "Hello from JsonServlet");
+        data.put("message", "Hello from JsonServlet,你好世界");
         data.put("status", "success");
         data.put("code", 200);
         

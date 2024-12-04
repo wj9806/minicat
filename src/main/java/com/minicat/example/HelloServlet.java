@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Enumeration;
 
 public class HelloServlet extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(HelloServlet.class);
@@ -27,7 +28,11 @@ public class HelloServlet extends HttpServlet {
         writer.write("<p>This is a response from HelloServlet</p>");
         writer.write("<p>Request URI: " + req.getRequestURI() + "</p>");
         writer.write("<p>Query String: " + req.getQueryString() + "</p>");
-        //writer.flush();
+        Enumeration<String> parameterNames = req.getParameterNames();
+        while (parameterNames.hasMoreElements()) {
+            String name = parameterNames.nextElement();
+            writer.write("<p>name: " + name + " ; value: " + req.getParameter(name) +" </p>");
+        }
     }
 
     @Override
