@@ -95,9 +95,11 @@ public class StaticResourceServlet extends HttpServlet {
             if (supportsGzip && cachedResource.gzippedContent != null) {
                 // 发送GZIP压缩的内容
                 resp.setHeader("Content-Encoding", "gzip");
+                resp.setHeader("Content-Length", String.valueOf(cachedResource.gzippedContent.length));
                 resp.getOutputStream().write(cachedResource.gzippedContent);
             } else {
                 // 发送原始内容
+                resp.setHeader("Content-Length", String.valueOf(cachedResource.content.length));
                 resp.getOutputStream().write(cachedResource.content);
             }
             

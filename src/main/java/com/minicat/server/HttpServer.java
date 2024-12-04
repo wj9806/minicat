@@ -218,7 +218,9 @@ public class HttpServer {
                 if (servlet != null) {
                     try {
                         servlet.service(servletRequest, servletResponse);
-                        outputStream.flush();
+                        if (!servletResponse.isCommitted()) {
+                            servletResponse.flushBuffer();
+                        }
                     } catch (Exception e) {
                         logger.error("Error processing request", e);
                         String errorResponse = "HTTP/1.1 500 Internal Server Error\r\n" +

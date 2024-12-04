@@ -13,9 +13,11 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     private int status = SC_OK;
     private Map<String, List<String>> headers = new HashMap<>();
     private boolean committed = false;
+    private ByteArrayOutputStream bodyBuffer;
 
     public HttpServletResponse(OutputStream outputStream) {
         this.outputStream = outputStream;
+        this.bodyBuffer = new ByteArrayOutputStream();
     }
 
     private void checkCommitted() {
@@ -24,13 +26,18 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
         }
     }
 
-    private void writeHeaders() throws IOException {
+    private void writeResponse() throws IOException {
         if (committed) return;
-        
+
         // Write status line
         String statusLine = "HTTP/1.1 " + status + " " + getStatusMessage(status) + "\r\n";
         outputStream.write(statusLine.getBytes());
         
+        // Set Content-Length if not already set
+        if (!headers.containsKey("Content-Length")) {
+            setContentLength(bodyBuffer.size());
+        }
+
         // Write headers
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
             for (String value : entry.getValue()) {
@@ -39,15 +46,23 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
             }
         }
         
-        // Write content type and encoding
+        // Write content type
         if (contentType != null) {
-            String contentTypeLine = "Content-Type: " + contentType + 
-                (characterEncoding != null ? "; charset=" + characterEncoding : "") + "\r\n";
-            outputStream.write(contentTypeLine.getBytes());
+            String contentTypeLine = "Content-Type: " + contentType;
+            if (characterEncoding != null) {
+                contentTypeLine += "; charset=" + characterEncoding;
+            }
+            outputStream.write((contentTypeLine + "\r\n").getBytes());
         }
         
         // End headers
         outputStream.write("\r\n".getBytes());
+        
+        // Write body
+        if (bodyBuffer.size() > 0) {
+            bodyBuffer.writeTo(outputStream);
+        }
+        
         outputStream.flush();
         committed = true;
     }
@@ -57,8 +72,55 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
             case SC_OK: return "OK";
             case SC_NOT_FOUND: return "Not Found";
             case SC_INTERNAL_SERVER_ERROR: return "Internal Server Error";
+            case SC_FOUND: return "Found";
             default: return "Unknown";
         }
+    }
+
+    @Override
+    public PrintWriter getWriter() throws IOException {
+        if (writer == null) {
+            writer = new PrintWriter(new OutputStreamWriter(bodyBuffer, characterEncoding), true);
+        }
+        return writer;
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return new ServletOutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                bodyBuffer.write(b);
+            }
+
+            @Override
+            public void flush() throws IOException {
+                // Do nothing - we'll flush in writeResponse
+            }
+
+            @Override
+            public void close() throws IOException {
+                // Do nothing - we'll close in writeResponse
+            }
+
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setWriteListener(javax.servlet.WriteListener writeListener) {
+                throw new UnsupportedOperationException("Write listeners are not supported");
+            }
+        };
+    }
+
+    @Override
+    public void flushBuffer() throws IOException {
+        if (writer != null) {
+            writer.flush();
+        }
+        writeResponse();
     }
 
     @Override
@@ -92,43 +154,111 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     }
 
     @Override
-    public PrintWriter getWriter() throws IOException {
-        if (writer == null) {
-            writeHeaders();
-            writer = new PrintWriter(new OutputStreamWriter(outputStream, characterEncoding), true);
+    public void sendError(int sc, String msg) throws IOException {
+        setStatus(sc);
+        if (msg != null) {
+            getWriter().write(msg);
         }
-        return writer;
+        flushBuffer();
     }
 
     @Override
-    public ServletOutputStream getOutputStream() throws IOException {
-        writeHeaders();
-        return new ServletOutputStream() {
-            @Override
-            public void write(int b) throws IOException {
-                outputStream.write(b);
-            }
-
-            @Override
-            public boolean isReady() {
-                return true;
-            }
-
-            @Override
-            public void setWriteListener(javax.servlet.WriteListener writeListener) {
-                throw new UnsupportedOperationException("Write listeners are not supported");
-            }
-        };
+    public void sendError(int sc) throws IOException {
+        sendError(sc, null);
     }
 
-    // 以下是必须实现但暂时不需要的方法
     @Override
-    public void addCookie(Cookie cookie) { }
+    public void sendRedirect(String location) throws IOException {
+        setStatus(SC_FOUND);
+        setHeader("Location", location);
+        flushBuffer();
+    }
 
     @Override
-    public boolean containsHeader(String name) { 
+    public void setContentLength(int len) {
+        setHeader("Content-Length", String.valueOf(len));
+    }
+
+    @Override
+    public void setContentLengthLong(long length) {
+        setHeader("Content-Length", String.valueOf(length));
+    }
+
+    @Override
+    public boolean containsHeader(String name) {
         return headers.containsKey(name);
     }
+
+    @Override
+    public String getHeader(String name) {
+        List<String> values = headers.get(name);
+        return values != null && !values.isEmpty() ? values.get(0) : null;
+    }
+
+    @Override
+    public Collection<String> getHeaders(String name) {
+        return headers.getOrDefault(name, Collections.emptyList());
+    }
+
+    @Override
+    public Collection<String> getHeaderNames() {
+        return headers.keySet();
+    }
+
+    @Override
+    public void resetBuffer() {
+        checkCommitted();
+        bodyBuffer.reset();
+        if (writer != null) {
+            writer = null;
+        }
+    }
+
+    @Override
+    public void reset() {
+        checkCommitted();
+        headers.clear();
+        status = SC_OK;
+        bodyBuffer.reset();
+        if (writer != null) {
+            writer = null;
+        }
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+        return characterEncoding;
+    }
+
+    @Override
+    public String getContentType() {
+        return contentType;
+    }
+
+    @Override
+    public int getBufferSize() {
+        return bodyBuffer.size();
+    }
+
+    @Override
+    public boolean isCommitted() {
+        return committed;
+    }
+
+    // 以下方法暂不需要实现
+    @Override
+    public void setBufferSize(int size) { }
+
+    @Override
+    public void setLocale(Locale loc) { }
+
+    @Override
+    public Locale getLocale() {
+        return Locale.getDefault();
+    }
+
+    @Override
+    public void addCookie(Cookie cookie) { }
 
     @Override
     public String encodeURL(String url) { return url; }
@@ -141,25 +271,6 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
 
     @Override
     public String encodeRedirectUrl(String url) { return url; }
-
-    @Override
-    public void sendError(int sc, String msg) throws IOException {
-        setStatus(sc);
-        if (msg != null) {
-            getWriter().write(msg);
-        }
-    }
-
-    @Override
-    public void sendError(int sc) throws IOException {
-        sendError(sc, null);
-    }
-
-    @Override
-    public void sendRedirect(String location) throws IOException {
-        setStatus(SC_FOUND);
-        setHeader("Location", location);
-    }
 
     @Override
     public void setDateHeader(String name, long date) {
@@ -189,80 +300,5 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     @Override
     public int getStatus() {
         return status;
-    }
-
-    @Override
-    public String getHeader(String name) {
-        List<String> values = headers.get(name);
-        return values != null && !values.isEmpty() ? values.get(0) : null;
-    }
-
-    @Override
-    public Collection<String> getHeaders(String name) {
-        return headers.getOrDefault(name, Collections.emptyList());
-    }
-
-    @Override
-    public Collection<String> getHeaderNames() {
-        return headers.keySet();
-    }
-
-    @Override
-    public String getCharacterEncoding() {
-        return characterEncoding;
-    }
-
-    @Override
-    public String getContentType() {
-        return contentType;
-    }
-
-    @Override
-    public void setContentLength(int len) {
-        setHeader("Content-Length", String.valueOf(len));
-    }
-
-    @Override
-    public void setContentLengthLong(long length) {
-        setHeader("Content-Length", String.valueOf(length));
-    }
-
-    @Override
-    public void setBufferSize(int size) { }
-
-    @Override
-    public int getBufferSize() { return 0; }
-
-    @Override
-    public void flushBuffer() throws IOException {
-        if (writer != null) {
-            writer.flush();
-        }
-        outputStream.flush();
-    }
-
-    @Override
-    public void resetBuffer() {
-        checkCommitted();
-    }
-
-    @Override
-    public boolean isCommitted() {
-        return committed;
-    }
-
-    @Override
-    public void reset() {
-        checkCommitted();
-        headers.clear();
-        status = SC_OK;
-    }
-
-    @Override
-    public void setLocale(Locale loc) { }
-
-    @Override
-    public Locale getLocale() {
-        return Locale.getDefault();
     }
 }

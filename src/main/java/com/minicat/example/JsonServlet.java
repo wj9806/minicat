@@ -43,7 +43,7 @@ public class JsonServlet extends HttpServlet {
         // 发送响应
         PrintWriter writer = resp.getWriter();
         writer.write(json);
-        writer.flush();
+        //writer.flush();
     }
     
     private String toJson(Map<String, Object> map) {

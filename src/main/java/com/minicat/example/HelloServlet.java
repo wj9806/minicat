@@ -18,11 +18,6 @@ public class HelloServlet extends HttpServlet {
     }
 
     @Override
-    public void destroy() {
-        logger.info("HelloServlet destroy...");
-    }
-
-    @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         resp.setContentType("text/html");
@@ -32,6 +27,11 @@ public class HelloServlet extends HttpServlet {
         writer.write("<p>This is a response from HelloServlet</p>");
         writer.write("<p>Request URI: " + req.getRequestURI() + "</p>");
         writer.write("<p>Query String: " + req.getQueryString() + "</p>");
-        writer.flush();
+        //writer.flush();
+    }
+
+    @Override
+    public void destroy() {
+        logger.info("HelloServlet destroy...");
     }
 }
