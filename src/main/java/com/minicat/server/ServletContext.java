@@ -108,6 +108,14 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         if (ext.endsWith(".gif")) return "image/gif";
         if (ext.endsWith(".xml")) return "application/xml";
         if (ext.endsWith(".pdf")) return "application/pdf";
+        if (ext.endsWith(".mp4")) return "video/mp4";
+        if (ext.endsWith(".webm")) return "video/webm";
+        if (ext.endsWith(".ogg")) return "video/ogg";
+        if (ext.endsWith(".mov")) return "video/quicktime";
+        if (ext.endsWith(".avi")) return "video/x-msvideo";
+        if (ext.endsWith(".wmv")) return "video/x-ms-wmv";
+        if (ext.endsWith(".flv")) return "video/x-flv";
+        if (ext.endsWith(".mkv")) return "video/x-matroska";
         return "application/octet-stream";
     }
 
@@ -248,35 +256,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
             }
 
             Servlet servlet = (Servlet) clazz.getConstructor().newInstance();
-            servlet.init(new ServletConfig() {
-                @Override
-                public String getServletName() {
-                    return servletName;
-                }
-
-                @Override
-                public ServletContext getServletContext() {
-                    return ServletContext.this;
-                }
-
-                @Override
-                public String getInitParameter(String name) {
-                    return null;
-                }
-
-                @Override
-                public Enumeration<String> getInitParameterNames() {
-                    return Collections.emptyEnumeration();
-                }
-            });
-
-            if (servlet instanceof HttpServlet) {
-                servletMap.put(servletName, (HttpServlet) servlet);
-            }
-
-            ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, className, this);
-            servletRegistrations.put(servletName, registration);
-            return registration;
+            return addServlet(servletName, servlet);
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate servlet: " + className, e);
         }
@@ -339,35 +319,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
 
         try {
             Servlet servlet = servletClass.getConstructor().newInstance();
-            servlet.init(new ServletConfig() {
-                @Override
-                public String getServletName() {
-                    return servletName;
-                }
-
-                @Override
-                public ServletContext getServletContext() {
-                    return ServletContext.this;
-                }
-
-                @Override
-                public String getInitParameter(String name) {
-                    return null;
-                }
-
-                @Override
-                public Enumeration<String> getInitParameterNames() {
-                    return Collections.emptyEnumeration();
-                }
-            });
-
-            if (servlet instanceof HttpServlet) {
-                servletMap.put(servletName, (HttpServlet) servlet);
-            }
-
-            ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, servletClass.getName(), this);
-            servletRegistrations.put(servletName, registration);
-            return registration;
+            return addServlet(servletName, servlet);
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate servlet: " + servletClass.getName(), e);
         }

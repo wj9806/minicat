@@ -36,6 +36,14 @@ public class StaticResourceServlet extends HttpServlet {
         CONTENT_TYPES.put(".ico", "image/x-icon");
         CONTENT_TYPES.put(".svg", "image/svg+xml");
         CONTENT_TYPES.put(".txt", "text/plain");
+        CONTENT_TYPES.put(".mp4", "video/mp4");
+        CONTENT_TYPES.put(".webm", "video/webm");
+        CONTENT_TYPES.put(".ogg", "video/ogg");
+        CONTENT_TYPES.put(".mov", "video/quicktime");
+        CONTENT_TYPES.put(".avi", "video/x-msvideo");
+        CONTENT_TYPES.put(".wmv", "video/x-ms-wmv");
+        CONTENT_TYPES.put(".flv", "video/x-flv");
+        CONTENT_TYPES.put(".mkv", "video/x-matroska");
     }
     
     public StaticResourceServlet(String staticPath) {
@@ -69,14 +77,14 @@ public class StaticResourceServlet extends HttpServlet {
                     cachedResource = loadAndCacheResource(resourcePath, resourceStream);
                 }
             }
-            
+
             // 检查If-None-Match头
             String clientEtag = req.getHeader("If-None-Match");
             if (clientEtag != null && clientEtag.equals(cachedResource.etag)) {
                 resp.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
                 return;
             }
-            
+
             // 设置Content-Type
             String contentType = getContentType(uri);
             resp.setContentType(contentType);
@@ -102,10 +110,10 @@ public class StaticResourceServlet extends HttpServlet {
                 resp.setHeader("Content-Length", String.valueOf(cachedResource.content.length));
                 resp.getOutputStream().write(cachedResource.content);
             }
-            
+
         } catch (Exception e) {
             logger.error("Error serving static resource: {}", resourcePath, e);
-            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Error reading resource: " + e.getMessage());
         }
     }
