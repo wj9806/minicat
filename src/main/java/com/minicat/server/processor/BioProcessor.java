@@ -1,21 +1,30 @@
-package com.minicat.server;
+package com.minicat.server.processor;
 
+import com.minicat.server.HttpServletRequest;
+import com.minicat.server.HttpServletResponse;
+import com.minicat.server.ServletContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.servlet.http.HttpServlet;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.Socket;
 
-public class RequestProcessor {
-    private static final Logger logger = LoggerFactory.getLogger(RequestProcessor.class);
+/**
+ * BIO模式的请求处理器
+ */
+public class BioProcessor extends Processor {
+    private static final Logger logger = LoggerFactory.getLogger(BioProcessor.class);
     private final ServletContext servletContext;
-
-    public RequestProcessor(ServletContext servletContext) {
+    private final Socket socket;
+    
+    public BioProcessor(ServletContext servletContext, Socket socket) {
         this.servletContext = servletContext;
+        this.socket = socket;
     }
-
-    public void process(Socket socket) throws Exception {
+    
+    @Override
+    public void process() throws Exception {
         try (InputStream inputStream = socket.getInputStream();
              OutputStream outputStream = socket.getOutputStream()) {
 
@@ -72,18 +81,12 @@ public class RequestProcessor {
     }
 
     private void sendNotFoundResponse(OutputStream outputStream) throws Exception {
-        String notFoundResponse = "HTTP/1.1 404 Not Found\r\n" +
-                "Content-Type: text/html\r\n" +
-                "Content-Length: 23\r\n\r\n" +
-                "<h1>404 Not Found</h1>";
+        String notFoundResponse = notFoundResponse();
         outputStream.write(notFoundResponse.getBytes());
     }
 
     private void sendErrorResponse(OutputStream outputStream, String message) throws Exception {
-        String errorResponse = "HTTP/1.1 500 Internal Server Error\r\n" +
-                "Content-Type: text/html\r\n" +
-                "Content-Length: " + message.length() + "\r\n\r\n" +
-                message;
+        String errorResponse = errorResponse(message);
         outputStream.write(errorResponse.getBytes());
     }
 }

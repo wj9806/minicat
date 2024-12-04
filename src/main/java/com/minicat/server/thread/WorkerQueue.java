@@ -11,12 +11,12 @@ import java.util.concurrent.locks.ReentrantLock;
  * 1. 如果线程数小于最大线程数，优先创建新线程
  * 2. 如果线程数达到最大线程数，才将任务放入队列
  */
-public class MinicatTaskQueue extends LinkedBlockingQueue<Runnable> {
+public class WorkerQueue extends LinkedBlockingQueue<Runnable> {
     private static final long serialVersionUID = -1L;
     private transient ThreadPoolExecutor executor;
     private transient ReentrantLock lock = new ReentrantLock();
 
-    public MinicatTaskQueue(int capacity) {
+    public WorkerQueue(int capacity) {
         super(capacity);
     }
 

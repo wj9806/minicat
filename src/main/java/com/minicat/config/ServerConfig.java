@@ -13,7 +13,7 @@ public class ServerConfig {
     private static final Properties properties = new Properties();
     private static ServerConfig instance;
     
-    private int port;
+    private int port = 8080;
     private String contextPath;
     private String staticPath;
     private boolean showBanner;
@@ -69,6 +69,10 @@ public class ServerConfig {
 
     public int getPort() {
         return port;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
     }
 
     public String getContextPath() {

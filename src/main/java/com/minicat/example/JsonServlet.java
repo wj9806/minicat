@@ -45,7 +45,8 @@ public class JsonServlet extends HttpServlet {
         writer.write(json);
         //writer.flush();
     }
-    
+
+    @SuppressWarnings("unchecked")
     private String toJson(Map<String, Object> map) {
         StringBuilder json = new StringBuilder("{");
         boolean first = true;

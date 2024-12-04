@@ -1,17 +1,16 @@
 package com.minicat.server;
 
 import com.minicat.config.ServerConfig;
-import com.minicat.server.thread.MinicatTaskQueue;
-import com.minicat.server.thread.MinicatThreadPool;
+import com.minicat.server.connector.BioConnector;
+import com.minicat.server.connector.ServerConnector;
+import com.minicat.server.thread.WorkerQueue;
+import com.minicat.server.thread.Worker;
 import com.minicat.util.BannerPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServlet;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,101 +20,82 @@ public class HttpServer implements Lifecycle {
     private int port;
     private String contextPath;
     private String staticPath;
-    private ThreadPoolExecutor threadPool;
-    private ServerConfig config;
+    private Worker worker;
+    private final ServerConfig config;
     private volatile boolean running = false;
-    private ServletContext servletContext;
-    private RequestProcessor requestProcessor;
-    private ServerSocket serverSocket;
+    private final ServletContext servletContext;
+    private final ServerConnector connector;
+    private final long startTime;
 
-    public HttpServer() throws Exception {
-        config = ServerConfig.getInstance();
+    public HttpServer() {
+        this(ServerConfig.getInstance().getPort());
+    }
+
+    public HttpServer(int port) {
+        this.startTime = System.currentTimeMillis();
+        this.config = ServerConfig.getInstance();
+        this.config.setPort(port);
         if (config.isShowBanner()) {
             BannerPrinter.printBanner();
         }
-        this.port = config.getPort();
+        this.port = port;
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
         this.servletContext = new ServletContext(contextPath, staticPath);
-        this.requestProcessor = new RequestProcessor(servletContext);
-    }
-    
-    public HttpServer(int port) throws Exception {
-        this();
-        this.port = port;
+        //创建工作线程
+        this.createWorker();
+        this.connector = new BioConnector(worker, servletContext, config);
     }
 
     @Override
     public void init() throws Exception {
-        if (config.isThreadPoolEnabled()) {
-            initThreadPool();
-        }
+        // 打印启动信息
+        printStartupInfo();
+        // 注册关闭钩子
+        registerShutdownHook();
+        //初始化工作线程
+        initWorker();
+
         this.servletContext.init();
-        logger.info("Minicat Server initialized");
+        this.connector.init();
     }
 
     @Override
     public void start() throws Exception {
-        logger.info("Starting Minicat server...");
-        running = true;
+        long totalTime = System.currentTimeMillis() - startTime;
+        logger.info("MiniCat server started in {} ms ", totalTime);
 
-        // 打印启动信息
-        printStartupInfo();
-
-        // 注册关闭钩子
-        registerShutdownHook();
-
-        //初始化
-        init();
-
-        // 启动服务器并处理请求
-        openSocket();
+        this.running = true;
+        this.connector.start();
     }
 
     @Override
     public void stop() throws Exception {
-        logger.info("Stopping Minicat server...");
-        running = false;
+        logger.info("Stopping MiniCat server...");
+        this.running = false;
+        this.connector.stop();
 
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logger.error("Error closing server socket", e);
-            }
+        if (worker != null) {
+            worker.stop();
         }
-
-        if (config.isThreadPoolEnabled() && threadPool != null) {
-            threadPool.shutdown();
-            try {
-                if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
-                    threadPool.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                threadPool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-        logger.info("Minicat Server stopped");
+        logger.info("MiniCat Server stopped");
     }
 
     @Override
     public void destroy() throws Exception {
-        logger.info("Destroying Minicat server...");
+        logger.info("Destroying MiniCat server...");
         
         // 销毁所有 Servlet
-        servletContext.destroy();
+        this.servletContext.destroy();
+        this.connector.destroy();
         
-        // 清理资源
-        if (threadPool != null) {
-            threadPool.shutdownNow();
-        }
-        
-        logger.info("Minicat Server destroyed");
+        logger.info("MiniCat Server destroyed");
     }
 
-    private void initThreadPool() {
-        MinicatTaskQueue taskQueue = new MinicatTaskQueue(config.getThreadPoolQueueSize());
+    private void createWorker() {
+        if (!config.isThreadPoolEnabled()) return;
+
+        WorkerQueue taskQueue = new WorkerQueue(config.getThreadPoolQueueSize());
         AtomicInteger threadNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
             Thread thread = new Thread(r);
@@ -123,58 +103,41 @@ public class HttpServer implements Lifecycle {
             return thread;
         };
 
-        threadPool = new MinicatThreadPool(
+        worker = new Worker(
             config.getThreadPoolCoreSize(),
             config.getThreadPoolMaxSize(),
             config.getThreadPoolKeepAliveTime(),
             TimeUnit.SECONDS,
             taskQueue,
             threadFactory,
-            new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时，在调用者线程中执行任务
+            new ThreadPoolExecutor.CallerRunsPolicy()
         );
-        
-        // 设置executor引用，使队列可以访问到线程池的信息
-        taskQueue.setExecutor(threadPool);
 
-        // 允许核心线程超时
-        threadPool.allowCoreThreadTimeOut(true);
-
-        // 预启动所有核心线程
-        threadPool.prestartAllCoreThreads();
+        taskQueue.setExecutor(worker);
     }
 
-    private void openSocket() throws IOException {
-        serverSocket = new ServerSocket(port);
-        try {
-            while (running) {
-                try {
-                    Socket socket = serverSocket.accept();
-                    handleRequest(socket);
-                } catch (Exception e) {
-                    if (running) {
-                        logger.error("Error accepting connection", e);
-                    }
-                }
-            }
-        } finally {
-            if (!serverSocket.isClosed()) {
-                serverSocket.close();
-            }
-        }
+    private void initWorker() {
+        if (!config.isThreadPoolEnabled()) return;
+
+        // 允许核心线程超时
+        worker.allowCoreThreadTimeOut(true);
+
+        // 预启动所有核心线程
+        worker.prestartAllCoreThreads();
     }
 
     private void printStartupInfo() {
-        logger.info("=====>>>minicat start on port: {}", port);
-        logger.info("=====>>>context path: {}", contextPath);
+        logger.info("MiniCat context path: {}", contextPath.isEmpty() ? "/" : contextPath);
 
         if (config.isThreadPoolEnabled()) {
-            logger.info("=====>>>worker pool: enabled, core={}, max={}, queueSize={}",
+            logger.info("MiniCat worker pool: enabled, core={}, max={}, queueSize={}",
                     config.getThreadPoolCoreSize(),
                     config.getThreadPoolMaxSize(),
                     config.getThreadPoolQueueSize());
         } else {
-            logger.info("=====>>>worker pool: disabled");
+            logger.info("MiniCat worker pool: disabled");
         }
+        logger.info("MiniCat start on port: {}", port);
     }
     
     private void registerShutdownHook() {
@@ -185,29 +148,7 @@ public class HttpServer implements Lifecycle {
             } catch (Exception e) {
                 logger.error("Error shutting down server", e);
             }
-        }, "Minicat-Destroy-Hook"));
-    }
-    
-    private void handleRequest(Socket socket) {
-        Runnable task = () -> {
-            try {
-                requestProcessor.process(socket);
-            } catch (Exception e) {
-                logger.error("Error processing request", e);
-            } finally {
-                try {
-                    socket.close();
-                } catch (Exception e) {
-                    logger.error("Error closing socket", e);
-                }
-            }
-        };
-
-        if (config.isThreadPoolEnabled()) {
-            threadPool.execute(task);
-        } else {
-            task.run();
-        }
+        }, "MiniCat-Destroy-Hook"));
     }
 
     public void addServlet(String url, HttpServlet servlet) {
@@ -222,7 +163,7 @@ public class HttpServer implements Lifecycle {
             return;
         }
 
-        logger.info("Adding servlet: name='{}', class='{}', url='{}'", servletName, className, url);
+        logger.debug("Adding servlet: name='{}', class='{}', url='{}'", servletName, className, url);
 
         // 添加映射
         registration.addMapping(url);
