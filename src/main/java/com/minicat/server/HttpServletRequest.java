@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpServletRequest implements javax.servlet.http.HttpServletRequest {
     private String method;
@@ -18,6 +19,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     private Map<String, String[]> parameters = new HashMap<>();
     private String characterEncoding = "UTF-8";
     private ServletContext servletContext;
+    private Map<String, Object> attributes = new ConcurrentHashMap<>();
 
     public HttpServletRequest(String method, String requestURI, String protocol) {
         this.method = method;
@@ -218,10 +220,47 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) { return null; }
 
     @Override
-    public Object getAttribute(String name) { return null; }
+    public Object getAttribute(String name) {
+        return attributes.get(name);
+    }
 
     @Override
-    public Enumeration<String> getAttributeNames() { return null; }
+    public Enumeration<String> getAttributeNames() {
+        return Collections.enumeration(attributes.keySet());
+    }
+
+    @Override
+    public void setAttribute(String name, Object value) {
+        if (value == null) {
+            removeAttribute(name);
+            return;
+        }
+        
+        Object oldValue = attributes.put(name, value);
+        
+        // 如果是新增属性
+        if (oldValue == null) {
+            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
+                listener.attributeAdded(new ServletRequestAttributeEvent(servletContext, this, name, value));
+            }
+        } 
+        // 如果是修改属性
+        else if (!value.equals(oldValue)) {
+            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
+                listener.attributeReplaced(new ServletRequestAttributeEvent(servletContext, this, name, oldValue));
+            }
+        }
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        Object oldValue = attributes.remove(name);
+        if (oldValue != null) {
+            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
+                listener.attributeRemoved(new ServletRequestAttributeEvent(servletContext, this, name, oldValue));
+            }
+        }
+    }
 
     @Override
     public String getCharacterEncoding() { return characterEncoding; }
@@ -300,12 +339,6 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     @Override
     public boolean isSecure() { return false; }
-
-    @Override
-    public void removeAttribute(String name) { }
-
-    @Override
-    public void setAttribute(String name, Object o) { }
 
     @Override
     public boolean isAsyncStarted() { return false; }

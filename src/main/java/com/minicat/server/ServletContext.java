@@ -1,7 +1,11 @@
 package com.minicat.server;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.descriptor.JspConfigDescriptor;
+import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionIdListener;
+import javax.servlet.http.HttpSessionListener;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -17,6 +21,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
     private final Map<String, ServletRegistrationImpl> servletRegistrations = new HashMap<>();
     private final String serverInfo = "MiniCat/1.0";
     private final String staticPath;
+    private final List<ServletRequestAttributeListener> requestAttributeListeners = new ArrayList<>();
 
     public ServletContext(String contextPath, String staticPath) {
         this.contextPath = contextPath;
@@ -242,7 +247,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
                 throw new IllegalArgumentException("Class " + className + " is not a Servlet");
             }
 
-            Servlet servlet = (Servlet) clazz.getDeclaredConstructor().newInstance();
+            Servlet servlet = (Servlet) clazz.getConstructor().newInstance();
             servlet.init(new ServletConfig() {
                 @Override
                 public String getServletName() {
@@ -333,7 +338,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         }
 
         try {
-            Servlet servlet = servletClass.getDeclaredConstructor().newInstance();
+            Servlet servlet = servletClass.getConstructor().newInstance();
             servlet.init(new ServletConfig() {
                 @Override
                 public String getServletName() {
@@ -375,7 +380,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         }
 
         try {
-            return clazz.getDeclaredConstructor().newInstance();
+            return clazz.getConstructor().newInstance();
         } catch (Exception e) {
             throw new ServletException("Failed to instantiate servlet", e);
         }
@@ -442,19 +447,61 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
 
     @Override
     public void addListener(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            Object obj = clazz.getConstructor().newInstance();
+
+            if (!(obj instanceof EventListener)) {
+                throw new IllegalArgumentException(className + " is not instance of the EventListener");
+            }
+
+            EventListener listener = (EventListener) obj;
+            addListener(listener);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Listener class not found: " + className, e);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to instantiate listener", e);
+        }
     }
 
     @Override
     public <T extends EventListener> void addListener(T t) {
+        if (t instanceof ServletRequestAttributeListener) {
+            requestAttributeListeners.add((ServletRequestAttributeListener) t);
+        }
     }
 
     @Override
     public void addListener(Class<? extends EventListener> listenerClass) {
+        try {
+            EventListener listener = listenerClass.getConstructor().newInstance();
+            addListener(listener);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to instantiate listener", e);
+        }
     }
 
     @Override
     public <T extends EventListener> T createListener(Class<T> clazz) throws ServletException {
-        return null;
+        try {
+            T listener = clazz.getConstructor().newInstance();
+            if (listener instanceof ServletContextListener ||
+                    listener instanceof ServletContextAttributeListener ||
+                    listener instanceof ServletRequestListener ||
+                    listener instanceof ServletRequestAttributeListener ||
+                    listener instanceof HttpSessionListener ||
+                    listener instanceof HttpSessionIdListener ||
+                    listener instanceof HttpSessionAttributeListener) {
+                return listener;
+            }
+            throw new IllegalArgumentException("wrong Listener type: " + clazz.getName());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public List<ServletRequestAttributeListener> getRequestAttributeListeners() {
+        return requestAttributeListeners;
     }
 
     @Override
