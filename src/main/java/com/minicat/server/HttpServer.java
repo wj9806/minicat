@@ -9,14 +9,13 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServlet;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class HttpServer {
+public class HttpServer implements Lifecycle {
     private static final Logger logger = LoggerFactory.getLogger(HttpServer.class);
     
     private int port;
@@ -26,8 +25,10 @@ public class HttpServer {
     private ServerConfig config;
     private volatile boolean running = false;
     private ServletContext servletContext;
+    private RequestProcessor requestProcessor;
+    private ServerSocket serverSocket;
 
-    public HttpServer() {
+    public HttpServer() throws Exception {
         config = ServerConfig.getInstance();
         if (config.isShowBanner()) {
             BannerPrinter.printBanner();
@@ -35,12 +36,84 @@ public class HttpServer {
         this.port = config.getPort();
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
+        this.servletContext = new ServletContext(contextPath, staticPath);
+        this.requestProcessor = new RequestProcessor(servletContext);
+    }
+    
+    public HttpServer(int port) throws Exception {
+        this();
+        this.port = port;
+    }
+
+    @Override
+    public void init() throws Exception {
         if (config.isThreadPoolEnabled()) {
             initThreadPool();
         }
-        this.servletContext = new ServletContext(contextPath, staticPath);
+        this.servletContext.init();
+        logger.info("Minicat Server initialized");
     }
-    
+
+    @Override
+    public void start() throws Exception {
+        logger.info("Starting Minicat server...");
+        running = true;
+
+        // 打印启动信息
+        printStartupInfo();
+
+        // 注册关闭钩子
+        registerShutdownHook();
+
+        //初始化
+        init();
+
+        // 启动服务器并处理请求
+        openSocket();
+    }
+
+    @Override
+    public void stop() throws Exception {
+        logger.info("Stopping Minicat server...");
+        running = false;
+
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logger.error("Error closing server socket", e);
+            }
+        }
+
+        if (config.isThreadPoolEnabled() && threadPool != null) {
+            threadPool.shutdown();
+            try {
+                if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+                    threadPool.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                threadPool.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        logger.info("Minicat Server stopped");
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        logger.info("Destroying Minicat server...");
+        
+        // 销毁所有 Servlet
+        servletContext.destroy();
+        
+        // 清理资源
+        if (threadPool != null) {
+            threadPool.shutdownNow();
+        }
+        
+        logger.info("Minicat Server destroyed");
+    }
+
     private void initThreadPool() {
         MinicatTaskQueue taskQueue = new MinicatTaskQueue(config.getThreadPoolQueueSize());
         AtomicInteger threadNumber = new AtomicInteger(1);
@@ -69,24 +142,10 @@ public class HttpServer {
         // 预启动所有核心线程
         threadPool.prestartAllCoreThreads();
     }
-    
-    public HttpServer(int port) {
-        this();
-        this.port = port;  // 允许通过构造函数覆盖配置文件中的端口
-    }
-    
-    public void start() throws Exception {
-        logger.info("Server is starting...");
-        running = true;
 
-        // 打印启动信息
-        printStartupInfo();
-
-        // 注册关闭钩子
-        registerShutdownHook();
-
-        // 启动服务器并处理请求
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+    private void openSocket() throws IOException {
+        serverSocket = new ServerSocket(port);
+        try {
             while (running) {
                 try {
                     Socket socket = serverSocket.accept();
@@ -97,37 +156,42 @@ public class HttpServer {
                     }
                 }
             }
+        } finally {
+            if (!serverSocket.isClosed()) {
+                serverSocket.close();
+            }
         }
     }
-    
+
     private void printStartupInfo() {
         logger.info("=====>>>minicat start on port: {}", port);
         logger.info("=====>>>context path: {}", contextPath);
 
         if (config.isThreadPoolEnabled()) {
-            logger.info("=====>>>thread pool: enabled, core={}, max={}, queueSize={}", 
+            logger.info("=====>>>worker pool: enabled, core={}, max={}, queueSize={}",
                     config.getThreadPoolCoreSize(),
                     config.getThreadPoolMaxSize(),
                     config.getThreadPoolQueueSize());
         } else {
-            logger.info("=====>>>thread pool: disabled");
+            logger.info("=====>>>worker pool: disabled");
         }
     }
     
     private void registerShutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                shutdown();
+                stop();
+                destroy();
             } catch (Exception e) {
                 logger.error("Error shutting down server", e);
             }
-        }));
+        }, "Minicat-Destroy-Hook"));
     }
     
     private void handleRequest(Socket socket) {
         Runnable task = () -> {
             try {
-                processRequest(socket);
+                requestProcessor.process(socket);
             } catch (Exception e) {
                 logger.error("Error processing request", e);
             } finally {
@@ -143,87 +207,6 @@ public class HttpServer {
             threadPool.execute(task);
         } else {
             task.run();
-        }
-    }
-    
-    public void shutdown() {
-        logger.info("Shutting down server...");
-        running = false;
-
-        if (config.isThreadPoolEnabled() && threadPool != null) {
-            threadPool.shutdown();
-            try {
-                if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
-                    threadPool.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                threadPool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-        logger.info("Server shutdown complete");
-    }
-    
-    private void processRequest(Socket socket) throws Exception {
-        InputStream inputStream = socket.getInputStream();
-        OutputStream outputStream = socket.getOutputStream();
-
-        // 解析HTTP请求
-        StringBuilder requestBuilder = new StringBuilder();
-        byte[] buffer = new byte[1024];
-        int len;
-        while ((len = inputStream.read(buffer)) != -1) {
-            requestBuilder.append(new String(buffer, 0, len));
-            if (requestBuilder.toString().contains("\r\n\r\n")) {
-                break;
-            }
-        }
-
-        String request = requestBuilder.toString();
-        String[] lines = request.split("\r\n");
-        if (lines.length > 0) {
-            String[] requestLine = lines[0].split(" ");
-            if (requestLine.length >= 3) {
-                String method = requestLine[0];
-                String uri = requestLine[1];
-                String protocol = requestLine[2];
-
-                logger.debug("Received request for URI: {}", uri);
-
-                // 处理context-path
-                if (!contextPath.isEmpty() && !uri.startsWith(contextPath)) {
-                    String notFoundResponse = "HTTP/1.1 404 Not Found\r\n" +
-                            "Content-Type: text/html\r\n" +
-                            "Content-Length: 23\r\n\r\n" +
-                            "<h1>404 Not Found</h1>";
-                    outputStream.write(notFoundResponse.getBytes());
-                    return;
-                }
-
-                // 创建Request和Response对象
-                HttpServletRequest servletRequest = new HttpServletRequest(method, uri, protocol);
-                servletRequest.setServletContext(servletContext);
-                HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
-                servletResponse.setServletContext(servletContext);
-
-                // 查找匹配的Servlet
-                HttpServlet servlet = servletContext.findMatchingServlet(uri);
-                if (servlet != null) {
-                    try {
-                        servlet.service(servletRequest, servletResponse);
-                        if (!servletResponse.isCommitted()) {
-                            servletResponse.flushBuffer();
-                        }
-                    } catch (Exception e) {
-                        logger.error("Error processing request", e);
-                        String errorResponse = "HTTP/1.1 500 Internal Server Error\r\n" +
-                                "Content-Type: text/html\r\n" +
-                                "Content-Length: " + e.getMessage().length() + "\r\n\r\n" +
-                                e.getMessage();
-                        outputStream.write(errorResponse.getBytes());
-                    }
-                }
-            }
         }
     }
 

@@ -1,5 +1,8 @@
 package com.minicat.server;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.servlet.*;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.descriptor.JspConfigDescriptor;
@@ -12,7 +15,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ServletContext implements javax.servlet.ServletContext, MiniCatServletContext {
+public class ServletContext implements javax.servlet.ServletContext, MiniCatServletContext, Lifecycle {
     private final String contextPath;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
     private final Map<String, String> initParameters = new HashMap<>();
@@ -22,17 +25,11 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
     private final String serverInfo = "MiniCat/1.0";
     private final String staticPath;
     private final List<ServletRequestAttributeListener> requestAttributeListeners = new ArrayList<>();
+    private static final Logger logger = LoggerFactory.getLogger(ServletContext.class.getName());
 
     public ServletContext(String contextPath, String staticPath) {
         this.contextPath = contextPath;
         this.staticPath = staticPath;
-        initDefaultServlet();
-    }
-
-    private void initDefaultServlet() {
-        StaticResourceServlet staticServlet = new StaticResourceServlet(staticPath);
-        ServletRegistration.Dynamic registration = addServlet("default", staticServlet);
-        registration.addMapping("/");
     }
 
     public HttpServlet findMatchingServlet(String uri) {
@@ -273,28 +270,6 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         }
 
         try {
-            servlet.init(new ServletConfig() {
-                @Override
-                public String getServletName() {
-                    return servletName;
-                }
-
-                @Override
-                public ServletContext getServletContext() {
-                    return ServletContext.this;
-                }
-
-                @Override
-                public String getInitParameter(String name) {
-                    return null;
-                }
-
-                @Override
-                public Enumeration<String> getInitParameterNames() {
-                    return Collections.emptyEnumeration();
-                }
-            });
-
             if (servlet instanceof HttpServlet) {
                 servletMap.put(servletName, (HttpServlet) servlet);
             }
@@ -480,5 +455,68 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         if (servletMap.containsKey(servletName)) {
             servletUrlPatterns.put(urlPattern, servletName);
         }
+    }
+
+    private void destroyServlet() {
+        for (Map.Entry<String, HttpServlet> entry : servletMap.entrySet()) {
+            try {
+                HttpServlet servlet = entry.getValue();
+                servlet.destroy();
+            } catch (Exception e) {
+                logger.error("Error destroying servlet: " + e.getMessage());
+            }
+        }
+        servletMap.clear();
+    }
+
+    @Override
+    public void init() throws Exception {
+        initServlet();
+    }
+
+    private void initServlet() throws ServletException {
+        StaticResourceServlet staticServlet = new StaticResourceServlet(staticPath);
+        ServletRegistration.Dynamic registration = addServlet("default", staticServlet);
+        registration.addMapping("/");
+
+        for (Map.Entry<String, HttpServlet> entry : servletMap.entrySet()) {
+            HttpServlet servlet = entry.getValue();
+            servlet.init(new ServletConfig() {
+                @Override
+                public String getServletName() {
+                    return entry.getKey();
+                }
+
+                @Override
+                public ServletContext getServletContext() {
+                    return ServletContext.this;
+                }
+
+                @Override
+                public String getInitParameter(String name) {
+                    return null;
+                }
+
+                @Override
+                public Enumeration<String> getInitParameterNames() {
+                    return Collections.emptyEnumeration();
+                }
+            });
+        }
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void stop() throws Exception {
+
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        destroyServlet();
     }
 }
