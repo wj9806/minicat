@@ -1,7 +1,7 @@
 package com.minicat.server.connector;
 
-import com.minicat.config.ServerConfig;
-import com.minicat.server.ServletContext;
+import com.minicat.server.config.ServerConfig;
+import com.minicat.core.ApplicationContext;
 import com.minicat.server.processor.BioProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,14 +18,14 @@ public class BioConnector implements ServerConnector {
     private static final Logger logger = LoggerFactory.getLogger(BioConnector.class);
     private final String name = "BioConnector";
     private final ServerConfig config;
-    private final ServletContext servletContext;
+    private final ApplicationContext applicationContext;
     private final ThreadPoolExecutor threadPool;
     private volatile boolean running = false;
     private ServerSocket serverSocket;
 
-    public BioConnector(ThreadPoolExecutor threadPool, ServletContext servletContext, ServerConfig config) {
+    public BioConnector(ThreadPoolExecutor threadPool, ApplicationContext applicationContext, ServerConfig config) {
         this.threadPool = threadPool;
-        this.servletContext = servletContext;
+        this.applicationContext = applicationContext;
         this.config = config;
     }
 
@@ -85,7 +85,7 @@ public class BioConnector implements ServerConnector {
     private void handleSocket(Socket socket) {
         Runnable task = () -> {
             try {
-                BioProcessor processor = new BioProcessor(servletContext, socket);
+                BioProcessor processor = new BioProcessor(applicationContext, socket);
                 processor.process();
             } catch (Exception e) {
                 logger.error("Error processing request", e);

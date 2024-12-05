@@ -1,6 +1,7 @@
 package com.minicat.server;
 
-import com.minicat.config.ServerConfig;
+import com.minicat.core.ApplicationContext;
+import com.minicat.server.config.ServerConfig;
 import com.minicat.server.connector.BioConnector;
 import com.minicat.server.connector.ServerConnector;
 import com.minicat.server.thread.WorkerQueue;
@@ -23,7 +24,7 @@ public class HttpServer implements Lifecycle {
     private Worker worker;
     private final ServerConfig config;
     private volatile boolean running = false;
-    private final ServletContext servletContext;
+    private final ApplicationContext applicationContext;
     private final ServerConnector connector;
     private final long startTime;
 
@@ -41,10 +42,10 @@ public class HttpServer implements Lifecycle {
         this.port = port;
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
-        this.servletContext = new ServletContext(contextPath, staticPath);
+        this.applicationContext = new ApplicationContext(this.config);
         //创建工作线程
         this.createWorker();
-        this.connector = new BioConnector(worker, servletContext, config);
+        this.connector = new BioConnector(worker, applicationContext, config);
     }
 
     @Override
@@ -56,7 +57,7 @@ public class HttpServer implements Lifecycle {
         //初始化工作线程
         initWorker();
 
-        this.servletContext.init();
+        this.applicationContext.init();
         this.connector.init();
     }
 
@@ -86,7 +87,7 @@ public class HttpServer implements Lifecycle {
         logger.info("Destroying MiniCat server...");
         
         // 销毁所有 Servlet
-        this.servletContext.destroy();
+        this.applicationContext.destroy();
         this.connector.destroy();
         
         logger.info("MiniCat Server destroyed");
@@ -156,7 +157,7 @@ public class HttpServer implements Lifecycle {
         String servletName = "servlet_" + className;
         
         // 尝试添加 servlet
-        ServletRegistration.Dynamic registration = servletContext.addServlet(servletName, servlet);
+        ServletRegistration.Dynamic registration = applicationContext.addServlet(servletName, servlet);
         if (registration == null) {
             // 如果返回 null，说明该名称已存在
             logger.warn("Failed to add servlet: name='{}', class='{}', url='{}'", servletName, className, url);

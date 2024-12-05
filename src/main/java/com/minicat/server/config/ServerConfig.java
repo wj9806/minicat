@@ -1,4 +1,4 @@
-package com.minicat.config;
+package com.minicat.server.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import static com.minicat.config.ServerConfigKeys.*;
+import static com.minicat.server.config.ServerConfigKeys.*;
 
 public class ServerConfig {
     private static final Logger logger = LoggerFactory.getLogger(ServerConfig.class);

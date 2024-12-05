@@ -1,7 +1,10 @@
-package com.minicat.server;
+package com.minicat.core;
 
+import com.minicat.server.HttpServlet;
+import com.minicat.server.config.ServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -22,7 +25,7 @@ public class StaticResourceServlet extends HttpServlet {
     private static final Map<String, CachedResource> resourceCache = new ConcurrentHashMap<>();
     private static final long MAX_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
     private static long currentCacheSize = 0;
-    private final String staticPath;
+    private final ServerConfig config;
     
     static {
         CONTENT_TYPES.put(".html", "text/html");
@@ -46,22 +49,26 @@ public class StaticResourceServlet extends HttpServlet {
         CONTENT_TYPES.put(".mkv", "video/x-matroska");
     }
     
-    public StaticResourceServlet(String staticPath) {
-        this.staticPath = staticPath;
+    public StaticResourceServlet(ServerConfig config) {
+        this.config = config;
     }
     
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {
         String uri = req.getRequestURI();
-        
+        // 移除上下文路径
+        if (uri.startsWith(config.getContextPath())) {
+            uri = uri.substring(config.getContextPath().length());
+        }
+
         // 处理默认首页
         if (uri.equals("/") || uri.equals("")) {
             uri = "/index.html";
         }
         
         // 获取资源路径
-        String resourcePath = staticPath + uri;
+        String resourcePath = config.getStaticPath() + uri;
         logger.debug("Looking for static resource: {}", resourcePath);
         
         try {

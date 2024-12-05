@@ -1,4 +1,4 @@
-package com.minicat.config;
+package com.minicat.server.config;
 
 /**
  * Server configuration keys and default values

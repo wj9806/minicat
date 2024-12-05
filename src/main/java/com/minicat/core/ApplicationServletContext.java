@@ -1,6 +1,6 @@
-package com.minicat.server;
+package com.minicat.core;
 
-public interface MiniCatServletContext {
+public interface ApplicationServletContext {
     /**
      * 添加 Servlet 映射
      * @param servletName Servlet 名称

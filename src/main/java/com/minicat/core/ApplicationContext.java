@@ -1,5 +1,9 @@
-package com.minicat.server;
+package com.minicat.core;
 
+import com.minicat.server.*;
+import com.minicat.server.config.ServerConfig;
+import com.minicat.core.event.EventType;
+import com.minicat.core.event.ServletContextAttributeEventObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,21 +19,24 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ServletContext implements javax.servlet.ServletContext, MiniCatServletContext, Lifecycle {
+public class ApplicationContext implements javax.servlet.ServletContext, ApplicationServletContext, Lifecycle {
     private final String contextPath;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
     private final Map<String, String> initParameters = new HashMap<>();
     private final Map<String, HttpServlet> servletMap = new HashMap<>();
     private final Map<String, String> servletUrlPatterns = new HashMap<>();
     private final Map<String, ServletRegistrationImpl> servletRegistrations = new HashMap<>();
+    private final ServerConfig config;
     private final String serverInfo = "MiniCat/1.0";
     private final String staticPath;
-    private final List<ServletRequestAttributeListener> requestAttributeListeners = new ArrayList<>();
-    private static final Logger logger = LoggerFactory.getLogger(ServletContext.class.getName());
+    private final InternalContext internalContext;
+    private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
 
-    public ServletContext(String contextPath, String staticPath) {
-        this.contextPath = contextPath;
-        this.staticPath = staticPath;
+    public ApplicationContext(ServerConfig config) {
+        this.config = config;
+        this.contextPath = config.getContextPath();
+        this.staticPath = config.getStaticPath();
+        this.internalContext = new InternalContext();
     }
 
     public HttpServlet findMatchingServlet(String uri) {
@@ -68,7 +75,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
     }
 
     @Override
-    public ServletContext getContext(String uripath) {
+    public ApplicationContext getContext(String uripath) {
         return this;
     }
 
@@ -219,16 +226,34 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
     @Override
     public void setAttribute(String name, Object object) {
         if (name == null) throw new IllegalArgumentException("Attribute name cannot be null");
+        
         if (object == null) {
             removeAttribute(name);
-        } else {
-            attributes.put(name, object);
+            return;
+        }
+        
+        Object oldValue = attributes.put(name, object);
+        
+        // 发布事件
+        if (oldValue == null) {
+            // 新增属性
+            internalContext.publishEvent(new ServletContextAttributeEventObject(
+                this, name, object, EventType.ATTRIBUTE_ADDED));
+        } else if (!object.equals(oldValue)) {
+            // 修改属性
+            internalContext.publishEvent(new ServletContextAttributeEventObject(
+                this, name, oldValue, EventType.ATTRIBUTE_REPLACED));
         }
     }
 
     @Override
     public void removeAttribute(String name) {
-        attributes.remove(name);
+        Object oldValue = attributes.remove(name);
+        if (oldValue != null) {
+            // 删除属性
+            internalContext.publishEvent(new ServletContextAttributeEventObject(
+                this, name, oldValue, EventType.ATTRIBUTE_REMOVED));
+        }
     }
 
     @Override
@@ -393,9 +418,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
 
     @Override
     public <T extends EventListener> void addListener(T t) {
-        if (t instanceof ServletRequestAttributeListener) {
-            requestAttributeListeners.add((ServletRequestAttributeListener) t);
-        }
+        internalContext.addListener(t);
     }
 
     @Override
@@ -425,10 +448,6 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public List<ServletRequestAttributeListener> getRequestAttributeListeners() {
-        return requestAttributeListeners;
     }
 
     @Override
@@ -475,7 +494,7 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
     }
 
     private void initServlet() throws ServletException {
-        StaticResourceServlet staticServlet = new StaticResourceServlet(staticPath);
+        StaticResourceServlet staticServlet = new StaticResourceServlet(this.config);
         ServletRegistration.Dynamic registration = addServlet("default", staticServlet);
         registration.addMapping("/");
 
@@ -488,8 +507,8 @@ public class ServletContext implements javax.servlet.ServletContext, MiniCatServ
                 }
 
                 @Override
-                public ServletContext getServletContext() {
-                    return ServletContext.this;
+                public ApplicationContext getServletContext() {
+                    return ApplicationContext.this;
                 }
 
                 @Override

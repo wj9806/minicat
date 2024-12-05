@@ -1,4 +1,6 @@
-package com.minicat.server;
+package com.minicat.http;
+
+import com.minicat.core.ApplicationContext;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -15,11 +17,15 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     private String protocol;
     private String requestURI;
     private String queryString;
-    private Map<String, String> headers = new HashMap<>();
-    private Map<String, String[]> parameters = new HashMap<>();
+    private final HttpHeaders headers = new HttpHeaders();
+    private final Map<String, String[]> parameters = new HashMap<>();
     private String characterEncoding = "UTF-8";
     private ServletContext servletContext;
-    private Map<String, Object> attributes = new ConcurrentHashMap<>();
+    private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+    private String remoteAddr;
+    private String remoteHost;
+    private int remotePort = -1;
+    private String remoteUser;
 
     public HttpServletRequest(String method, String requestURI, String protocol) {
         this.method = method;
@@ -34,6 +40,18 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
             parseParameters(this.queryString);
         } else {
             this.requestURI = requestURI;
+        }
+    }
+
+    /**
+     * 设置请求头
+     * @param headers 请求头对象
+     */
+    public void setHeaders(HttpHeaders headers) {
+        for (Map.Entry<String, List<String>> entry : headers.getAll().entrySet()) {
+            for (String value : entry.getValue()) {
+                this.headers.add(entry.getKey(), value);
+            }
         }
     }
 
@@ -71,8 +89,8 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         }
     }
 
-    public void setServletContext(ServletContext servletContext) {
-        this.servletContext = servletContext;
+    public void setServletContext(ApplicationContext applicationContext) {
+        this.servletContext = applicationContext;
     }
 
     @Override
@@ -118,17 +136,42 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     // 添加请求头
     public void addHeader(String name, String value) {
-        headers.put(name.toLowerCase(), value);
+        headers.add(name, value);
     }
 
     @Override
     public String getHeader(String name) {
-        return headers.get(name.toLowerCase());
+        return headers.getFirst(name);
     }
 
     @Override
     public Enumeration<String> getHeaderNames() {
-        return Collections.enumeration(headers.keySet());
+        return Collections.enumeration(headers.names());
+    }
+
+    @Override
+    public Enumeration<String> getHeaders(String name) { 
+        List<String> values = headers.get(name);
+        return values != null ? Collections.enumeration(values) : Collections.emptyEnumeration();
+    }
+
+    @Override
+    public int getIntHeader(String name) {
+        String value = getHeader(name);
+        return value != null ? Integer.parseInt(value) : -1;
+    }
+
+    @Override
+    public long getDateHeader(String name) {
+        String value = getHeader(name);
+        if (value == null) {
+            return -1L;
+        }
+        try {
+            return Date.parse(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Cannot parse date header '" + name + "': " + value);
+        }
     }
 
     // 以下是必须实现但暂时不需要的方法，返回默认值或抛出异常
@@ -137,17 +180,6 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     @Override
     public Cookie[] getCookies() { return new Cookie[0]; }
-
-    @Override
-    public long getDateHeader(String name) { return -1; }
-
-    @Override
-    public Enumeration<String> getHeaders(String name) { 
-        return Collections.enumeration(Collections.singletonList(getHeader(name))); 
-    }
-
-    @Override
-    public int getIntHeader(String name) { return -1; }
 
     @Override
     public String getPathInfo() { return null; }
@@ -161,7 +193,9 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     }
 
     @Override
-    public String getRemoteUser() { return null; }
+    public String getRemoteUser() {
+        return remoteUser;
+    }
 
     @Override
     public boolean isUserInRole(String role) { return false; }
@@ -173,7 +207,24 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public String getRequestedSessionId() { return null; }
 
     @Override
-    public StringBuffer getRequestURL() { return new StringBuffer(); }
+    public StringBuffer getRequestURL() {
+        StringBuffer url = new StringBuffer();
+        String scheme = getScheme();
+        int port = getServerPort();
+        String serverName = getServerName();
+
+        url.append(scheme).append("://").append(serverName);
+
+        // 只有在非默认端口时才添加端口号
+        if (("http".equals(scheme) && port != 80) || 
+            ("https".equals(scheme) && port != 443)) {
+            url.append(':').append(port);
+        }
+
+        url.append(getRequestURI());
+
+        return url;
+    }
 
     @Override
     public String getServletPath() { return ""; }
@@ -236,30 +287,12 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
             return;
         }
         
-        Object oldValue = attributes.put(name, value);
-        
-        // 如果是新增属性
-        if (oldValue == null) {
-            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
-                listener.attributeAdded(new ServletRequestAttributeEvent(servletContext, this, name, value));
-            }
-        } 
-        // 如果是修改属性
-        else if (!value.equals(oldValue)) {
-            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
-                listener.attributeReplaced(new ServletRequestAttributeEvent(servletContext, this, name, oldValue));
-            }
-        }
+        attributes.put(name, value);
     }
 
     @Override
     public void removeAttribute(String name) {
-        Object oldValue = attributes.remove(name);
-        if (oldValue != null) {
-            for (ServletRequestAttributeListener listener : servletContext.getRequestAttributeListeners()) {
-                listener.attributeRemoved(new ServletRequestAttributeEvent(servletContext, this, name, oldValue));
-            }
-        }
+        attributes.remove(name);
     }
 
     @Override
@@ -314,13 +347,35 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public Enumeration<Locale> getLocales() { return null; }
 
     @Override
-    public String getRemoteAddr() { return null; }
+    public String getRemoteAddr() {
+        return remoteAddr != null ? remoteAddr : "";
+    }
 
     @Override
-    public String getRemoteHost() { return null; }
+    public String getRemoteHost() {
+        return remoteHost != null ? remoteHost : getRemoteAddr();
+    }
 
     @Override
-    public int getRemotePort() { return 0; }
+    public int getRemotePort() {
+        return remotePort;
+    }
+
+    public void setRemoteAddr(String remoteAddr) {
+        this.remoteAddr = remoteAddr;
+    }
+
+    public void setRemoteHost(String remoteHost) {
+        this.remoteHost = remoteHost;
+    }
+
+    public void setRemotePort(int remotePort) {
+        this.remotePort = remotePort;
+    }
+
+    public void setRemoteUser(String remoteUser) {
+        this.remoteUser = remoteUser;
+    }
 
     @Override
     public RequestDispatcher getRequestDispatcher(String path) { return null; }

@@ -1,5 +1,8 @@
 package com.minicat.server;
 
+import com.minicat.core.ApplicationContext;
+import com.minicat.core.ApplicationServletContext;
+
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletRegistration;
 import javax.servlet.ServletSecurityElement;
@@ -8,7 +11,7 @@ import java.util.*;
 public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
     private final String servletName;
     private final String className;
-    private final ServletContext servletContext;
+    private final ApplicationContext applicationContext;
     private final Map<String, String> initParameters = new HashMap<>();
     private final Set<String> mappings = new HashSet<>();
     private int loadOnStartup = -1;
@@ -16,10 +19,10 @@ public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
     private boolean asyncSupported = false;
     private MultipartConfigElement multipartConfig;
 
-    public ServletRegistrationImpl(String servletName, String className, ServletContext servletContext) {
+    public ServletRegistrationImpl(String servletName, String className, ApplicationContext applicationContext) {
         this.servletName = servletName;
         this.className = className;
-        this.servletContext = servletContext;
+        this.applicationContext = applicationContext;
     }
 
     @Override
@@ -90,7 +93,7 @@ public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
         // 如果没有冲突，添加映射
         if (conflicts.isEmpty()) {
             for (String pattern : urlPatterns) {
-                ((MiniCatServletContext)servletContext).addServletMapping(servletName, pattern);
+                ((ApplicationServletContext) applicationContext).addServletMapping(servletName, pattern);
             }
         }
 
