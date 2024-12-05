@@ -35,6 +35,8 @@ public class JsonServlet extends HttpServlet {
         Map<String, Object> details = new HashMap<>();
         details.put("time", System.currentTimeMillis());
         details.put("version", "1.0.0");
+        details.put("pathInfo", req.getPathInfo());
+        details.put("servletPath", req.getServletPath());
         data.put("details", details);
         
         // 转换为JSON字符串
@@ -65,6 +67,8 @@ public class JsonServlet extends HttpServlet {
                 json.append(value);
             } else if (value instanceof Map) {
                 json.append(toJson((Map<String, Object>) value));
+            } else if (value == null) {
+                json.append("null");
             } else {
                 json.append("\"").append(value).append("\"");
             }

@@ -1,5 +1,6 @@
 package com.minicat.core;
 
+import com.minicat.http.HttpServletRequest;
 import com.minicat.server.*;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.event.EventType;
@@ -39,34 +40,81 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         this.internalContext = new InternalContext();
     }
 
-    public HttpServlet findMatchingServlet(String uri) {
+    public HttpServlet findMatchingServlet(HttpServletRequest servletRequest) {
+        String path = servletRequest.getRequestURI();
+        
         // 移除上下文路径
-        if (uri.startsWith(contextPath)) {
-            uri = uri.substring(contextPath.length());
+        if (path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
         }
 
         // 移除查询参数
-        String path = uri;
         if (path.contains("?")) {
             path = path.substring(0, path.indexOf("?"));
         }
 
-        // 首先尝试精确匹配
+        // 1. 精确路径匹配
         String servletName = servletUrlPatterns.get(path);
         if (servletName != null) {
+            servletRequest.setServletPath(path);
+            servletRequest.setPathInfo(null);
             return servletMap.get(servletName);
         }
 
-        // 然后尝试路径匹配
-        for (Map.Entry<String, String> entry : servletUrlPatterns.entrySet()) {
-            String pattern = entry.getKey();
-            if (pattern.endsWith("/*") && path.startsWith(pattern.substring(0, pattern.length() - 2))) {
-                return servletMap.get(entry.getValue());
+        // 2. 最长路径前缀匹配 (/xxx/*)
+        Map.Entry<String, String> matchedEntry = getMatchedPatternAndServlet(path);
+        if (matchedEntry != null) {
+            String pattern = matchedEntry.getKey();
+            String prefix = pattern.substring(0, pattern.length() - 2);
+            servletRequest.setServletPath(prefix);
+            if (path.length() > prefix.length()) {
+                servletRequest.setPathInfo(path.substring(prefix.length()));
+            } else {
+                servletRequest.setPathInfo(null);
+            }
+            return servletMap.get(matchedEntry.getValue());
+        }
+
+        // 3. 扩展名匹配 (*.xxx)
+        int lastDot = path.lastIndexOf('.');
+        if (lastDot >= 0) {
+            String extension = "*" + path.substring(lastDot);
+            servletName = servletUrlPatterns.get(extension);
+            if (servletName != null) {
+                servletRequest.setServletPath(path);
+                servletRequest.setPathInfo(null);
+                return servletMap.get(servletName);
             }
         }
 
-        // 如果没有匹配的servlet，返回静态资源servlet
+        // 4. 默认 servlet (/)
+        servletName = servletUrlPatterns.get("/");
+        if (servletName != null) {
+            servletRequest.setServletPath("");
+            servletRequest.setPathInfo(path);
+            return servletMap.get(servletName);
+        }
+
+        // 5. 未匹配
+        servletRequest.setServletPath("");
+        servletRequest.setPathInfo(null);
         return servletMap.get("default");
+    }
+
+    private Map.Entry<String, String> getMatchedPatternAndServlet(String path) {
+        String longestMatch = "";
+        Map.Entry<String, String> matchedEntry = null;
+        for (Map.Entry<String, String> entry : servletUrlPatterns.entrySet()) {
+            String pattern = entry.getKey();
+            if (pattern.endsWith("/*")) {
+                String prefix = pattern.substring(0, pattern.length() - 2);
+                if (path.startsWith(prefix) && prefix.length() > longestMatch.length()) {
+                    longestMatch = prefix;
+                    matchedEntry = entry;
+                }
+            }
+        }
+        return matchedEntry;
     }
 
     @Override

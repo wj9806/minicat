@@ -64,7 +64,8 @@ public class BioProcessor extends Processor {
                     HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
 
                     // 查找匹配的Servlet
-                    HttpServlet servlet = applicationContext.findMatchingServlet(uri);
+                    HttpServlet servlet = applicationContext.findMatchingServlet(servletRequest);
+
                     if (servlet != null) {
                         try {
                             servlet.service(servletRequest, servletResponse);
@@ -84,37 +85,95 @@ public class BioProcessor extends Processor {
     }
 
     private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext, String[] lines) {
-        String[] requestLine = lines[0].split(" ");
-        String method = requestLine[0];
-        String uri = requestLine[1];
-        String protocol = requestLine[2];
+        HttpServletRequest servletRequest = new HttpServletRequest(applicationContext, lines);
 
-        HttpServletRequest servletRequest = new HttpServletRequest(method, uri, protocol);
-        servletRequest.setServletContext(applicationContext);
+        // 解析并设置请求头
+        prepareHeaders(lines, servletRequest);
+
         // 设置远程客户端信息
+        prepareRemoteInfo(socket, servletRequest);
+
+        // 设置本地连接信息
+        prepareLocalInfo(socket, servletRequest);
+
+        // 设置服务器信息
+        prepareServerInfo(socket, servletRequest);
+
+        return servletRequest;
+    }
+
+    private void prepareLocalInfo(Socket socket, HttpServletRequest servletRequest) {
+        String localAddr = socket.getLocalAddress().getHostAddress();
+        String localName = socket.getLocalAddress().getHostName();
+        int localPort = socket.getLocalPort();
+        servletRequest.setLocalInfo(localAddr, localName, localPort);
+    }
+
+    private void prepareServerInfo(Socket socket, HttpServletRequest servletRequest) {
+        String serverName = "localhost";
+        int serverPort = 8080;
+        boolean isSecure;
+
+        try {
+            // 尝试从请求头中获取 Host
+            String host = servletRequest.getHeader("Host");
+            if (host != null) {
+                // 解析 Host 头，格式可能是：hostname:port 或 hostname
+                int colonIndex = host.indexOf(':');
+                if (colonIndex != -1) {
+                    serverName = host.substring(0, colonIndex);
+                    serverPort = Integer.parseInt(host.substring(colonIndex + 1));
+                } else {
+                    serverName = host;
+                    serverPort = 80;
+                }
+            } else {
+                // 如果没有 Host 头，使用本地地址和端口
+                serverName = socket.getLocalAddress().getHostName();
+                serverPort = socket.getLocalPort();
+            }
+        } catch (Exception e) {
+            // 解析失败时使用默认值，已在变量初始化时设置
+        }
+
+        // 检查是否是安全连接
+        isSecure = servletRequest.getProtocol() != null && 
+                   servletRequest.getProtocol().toLowerCase().startsWith("https");
+
+        // 只调用一次 setServerInfo
+        servletRequest.setServerInfo(serverName, serverPort, isSecure);
+    }
+
+    private void prepareRemoteInfo(Socket socket, HttpServletRequest servletRequest) {
         servletRequest.setRemoteAddr(socket.getInetAddress().getHostAddress());
         servletRequest.setRemoteHost(socket.getInetAddress().getHostName());
         servletRequest.setRemotePort(socket.getPort());
 
-        // 解析并设置请求头
-        HttpHeaders headers = HttpHeaders.parse(lines);
-        servletRequest.setHeaders(headers);
-
-        // 处理Basic认证的remoteUser
+        // 处理认证信息
         String authHeader = servletRequest.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Basic ")) {
-            try {
-                String base64Credentials = authHeader.substring("Basic ".length()).trim();
-                String credentials = new String(Base64.getDecoder().decode(base64Credentials), StandardCharsets.UTF_8);
-                // credentials = username:password
-                String username = credentials.split(":")[0];
-                servletRequest.setRemoteUser(username);
-            } catch (Exception ignore) {
+        if (authHeader != null) {
+            int space = authHeader.indexOf(' ');
+            if (space > 0) {
+                String authType = authHeader.substring(0, space).toUpperCase();
+                servletRequest.setAuthType(authType);
+
+                // 如果是 Basic 认证，设置 remoteUser
+                if ("BASIC".equalsIgnoreCase(authType)) {
+                    try {
+                        String base64Credentials = authHeader.substring(space + 1).trim();
+                        String credentials = new String(Base64.getDecoder().decode(base64Credentials), StandardCharsets.UTF_8);
+                        String username = credentials.split(":")[0];
+                        servletRequest.setRemoteUser(username);
+                    } catch (Exception ignore) {
+                    }
+                }
             }
         }
+    }
 
-        servletRequest.setServletContext(applicationContext);
-        return servletRequest;
+    private void prepareHeaders(String[] lines, HttpServletRequest servletRequest) {
+        HttpHeaders headers = HttpHeaders.parse(lines);
+        servletRequest.setHeaders(headers);
     }
 
     private void sendNotFoundResponse(OutputStream outputStream) throws Exception {

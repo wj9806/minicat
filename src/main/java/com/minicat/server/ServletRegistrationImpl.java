@@ -101,12 +101,35 @@ public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
     }
 
     private boolean isValidUrlPattern(String pattern) {
-        if (pattern.equals("/")) return true;
-        if (pattern.equals("/*")) return true;
-        if (pattern.startsWith("*.")) return true;
-        if (pattern.startsWith("/") && !pattern.contains("*")) return true;
-        if (pattern.startsWith("/") && pattern.endsWith("/*") && pattern.indexOf('*') == pattern.length() - 1) return true;
-        return false;
+        // 1. 验证空或 null
+        if (pattern == null || pattern.isEmpty()) {
+            return false;
+        }
+
+        // 2. 验证根路径
+        if (pattern.equals("/")) {
+            return true;
+        }
+
+        // 3. 验证扩展名匹配 (*.xxx)
+        if (pattern.startsWith("*.")) {
+            // 不允许路径分隔符
+            return !pattern.substring(2).contains("/") && !pattern.substring(2).contains("*");
+        }
+
+        // 4. 必须以 / 开头
+        if (!pattern.startsWith("/")) {
+            return false;
+        }
+
+        // 5. 验证路径通配符匹配 (/xxx/*)
+        if (pattern.contains("*")) {
+            // 通配符必须在末尾，并且格式为 /*
+            return pattern.endsWith("/*") && pattern.indexOf("*") == pattern.length() - 1;
+        }
+
+        // 6. 精确路径匹配
+        return true;
     }
 
     @Override

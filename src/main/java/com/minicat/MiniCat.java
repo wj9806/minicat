@@ -30,8 +30,8 @@ public class MiniCat {
 
     public static void main(String[] args) {
         MiniCat miniCat = new MiniCat();
-        miniCat.server.addServlet("/hello", new HelloServlet());
-        miniCat.server.addServlet("/json", new JsonServlet());
+        miniCat.server.addServlet(new HelloServlet(), "*.html");
+        miniCat.server.addServlet(new JsonServlet(), "/json", "/json2", "/json/*");
         miniCat.start();
     }
 }

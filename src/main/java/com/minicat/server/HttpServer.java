@@ -152,7 +152,7 @@ public class HttpServer implements Lifecycle {
         }, "MiniCat-Destroy-Hook"));
     }
 
-    public void addServlet(String url, HttpServlet servlet) {
+    public void addServlet(HttpServlet servlet, String... urls) {
         String className = servlet.getClass().getSimpleName();
         String servletName = "servlet_" + className;
         
@@ -160,13 +160,13 @@ public class HttpServer implements Lifecycle {
         ServletRegistration.Dynamic registration = applicationContext.addServlet(servletName, servlet);
         if (registration == null) {
             // 如果返回 null，说明该名称已存在
-            logger.warn("Failed to add servlet: name='{}', class='{}', url='{}'", servletName, className, url);
+            logger.warn("Failed to add servlet: name='{}', class='{}'", servletName, className);
             return;
         }
 
-        logger.debug("Adding servlet: name='{}', class='{}', url='{}'", servletName, className, url);
+        logger.debug("Adding servlet: name='{}', class='{}', urls='{}'", servletName, className, String.join(",", urls));
 
         // 添加映射
-        registration.addMapping(url);
+        registration.addMapping(urls);
     }
 }

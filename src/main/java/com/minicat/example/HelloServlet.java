@@ -39,6 +39,8 @@ public class HelloServlet extends HttpServlet {
         writer.write("<p>This is a response from HelloServlet</p>");
         writer.write("<p>Request URI: " + req.getRequestURI() + "</p>");
         writer.write("<p>Query String: " + req.getQueryString() + "</p>");
+        writer.write("<p>Path Info: " + req.getPathInfo() + "</p>");
+        writer.write("<p>Servlet Path: " + req.getServletPath() + "</p>");
         
         Enumeration<String> parameterNames = req.getParameterNames();
         while (parameterNames.hasMoreElements()) {

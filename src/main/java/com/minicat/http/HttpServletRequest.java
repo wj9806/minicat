@@ -7,31 +7,57 @@ import javax.servlet.http.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpServletRequest implements javax.servlet.http.HttpServletRequest {
-    private String method;
-    private String uri;
-    private String protocol;
-    private String requestURI;
+
+    //basic info
+    private final String method;
+    private final String protocol;
+    private final String requestURI;
     private String queryString;
     private final HttpHeaders headers = new HttpHeaders();
     private final Map<String, String[]> parameters = new HashMap<>();
-    private String characterEncoding = "UTF-8";
+    private Charset charset;
+    private boolean hasReadParameters;
+    private String pathInfo;
+    private String servletPath;
+
     private ServletContext servletContext;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+
+    //remote info
     private String remoteAddr;
     private String remoteHost;
     private int remotePort = -1;
     private String remoteUser;
+    private String authType;
 
-    public HttpServletRequest(String method, String requestURI, String protocol) {
+    //server info
+    private String scheme;
+    private String serverName;
+    private int serverPort;
+    private boolean secure;
+
+    //local info
+    private String localAddr;
+    private String localName;
+    private int localPort = -1;
+
+    public HttpServletRequest(ApplicationContext context, String[] lines) {
+        String[] requestLine = lines[0].split(" ");
+        String method = requestLine[0];
+        String requestURI = requestLine[1];
+        String protocol = requestLine[2];
+
         this.method = method;
         this.protocol = protocol;
-        this.uri = requestURI;
-        
+
         // Parse URI and query string
         if (requestURI.contains("?")) {
             String[] parts = requestURI.split("\\?", 2);
@@ -41,6 +67,8 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         } else {
             this.requestURI = requestURI;
         }
+
+        this.servletContext = context;
     }
 
     /**
@@ -59,17 +87,18 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         if (queryString == null || queryString.trim().isEmpty()) {
             return;
         }
-        
+        hasReadParameters = true;
+
         String[] pairs = queryString.split("&");
         for (String pair : pairs) {
             if (pair.trim().isEmpty()) {
                 continue;
             }
-            
+
             String[] keyValue = pair.split("=", 2);
             String key = decodeUrlParameter(keyValue[0]);
             String value = keyValue.length > 1 ? decodeUrlParameter(keyValue[1]) : "";
-            
+
             String[] values = parameters.get(key);
             if (values == null) {
                 parameters.put(key, new String[]{value});
@@ -80,10 +109,14 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
             }
         }
     }
-    
+
     private String decodeUrlParameter(String value) {
+        if (value == null) {
+            return null;
+        }
         try {
-            return java.net.URLDecoder.decode(value, characterEncoding);
+            String encoding = charset != null ? charset.name() : "ISO-8859-1";
+            return URLDecoder.decode(value, encoding);
         } catch (Exception e) {
             return value;
         }
@@ -150,7 +183,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     }
 
     @Override
-    public Enumeration<String> getHeaders(String name) { 
+    public Enumeration<String> getHeaders(String name) {
         List<String> values = headers.get(name);
         return values != null ? Collections.enumeration(values) : Collections.emptyEnumeration();
     }
@@ -176,13 +209,27 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     // 以下是必须实现但暂时不需要的方法，返回默认值或抛出异常
     @Override
-    public String getAuthType() { return null; }
+    public String getAuthType() {
+        return authType;
+    }
+
+    public void setAuthType(String authType) {
+        this.authType = authType;
+    }
+
+    public void setPathInfo(String pathInfo) {
+        this.pathInfo = pathInfo;
+    }
+
+    public void setServletPath(String servletPath) {
+        this.servletPath = servletPath;
+    }
 
     @Override
     public Cookie[] getCookies() { return new Cookie[0]; }
 
     @Override
-    public String getPathInfo() { return null; }
+    public String getPathInfo() { return pathInfo; }
 
     @Override
     public String getPathTranslated() { return null; }
@@ -216,7 +263,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         url.append(scheme).append("://").append(serverName);
 
         // 只有在非默认端口时才添加端口号
-        if (("http".equals(scheme) && port != 80) || 
+        if (("http".equals(scheme) && port != 80) ||
             ("https".equals(scheme) && port != 443)) {
             url.append(':').append(port);
         }
@@ -227,7 +274,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     }
 
     @Override
-    public String getServletPath() { return ""; }
+    public String getServletPath() { return servletPath; }
 
     @Override
     public HttpSession getSession(boolean create) { return null; }
@@ -296,10 +343,21 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     }
 
     @Override
-    public String getCharacterEncoding() { return characterEncoding; }
+    public String getCharacterEncoding() {
+        return charset != null ? charset.name() : null;
+    }
 
     @Override
-    public void setCharacterEncoding(String env) { this.characterEncoding = env; }
+    public void setCharacterEncoding(String env) throws UnsupportedEncodingException {
+        if (hasReadParameters) {
+            return; // 如果已经读取了参数，则不再允许更改编码
+        }
+        try {
+            this.charset = Charset.forName(env);
+        } catch (IllegalArgumentException e) {
+            throw new UnsupportedEncodingException(env);
+        }
+    }
 
     @Override
     public int getContentLength() { return 0; }
@@ -317,13 +375,25 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public BufferedReader getReader() { return null; }
 
     @Override
-    public String getLocalAddr() { return null; }
+    public String getLocalAddr() {
+        return localAddr;
+    }
 
     @Override
-    public String getLocalName() { return null; }
+    public String getLocalName() {
+        return localName;
+    }
 
     @Override
-    public int getLocalPort() { return 0; }
+    public int getLocalPort() {
+        return localPort;
+    }
+
+    public void setLocalInfo(String localAddr, String localName, int localPort) {
+        this.localAddr = localAddr;
+        this.localName = localName;
+        this.localPort = localPort;
+    }
 
     @Override
     public ServletContext getServletContext() {
@@ -381,19 +451,29 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public RequestDispatcher getRequestDispatcher(String path) { return null; }
 
     @Override
-    public String getRealPath(String path) { return null; }
+    public String getRealPath(String path) {
+        return servletContext != null ? servletContext.getRealPath(path) : null;
+    }
 
     @Override
-    public String getScheme() { return "http"; }
+    public String getScheme() {
+        return scheme;
+    }
 
     @Override
-    public String getServerName() { return "localhost"; }
+    public String getServerName() {
+        return serverName;
+    }
 
     @Override
-    public int getServerPort() { return 8080; }
+    public int getServerPort() {
+        return serverPort;
+    }
 
     @Override
-    public boolean isSecure() { return false; }
+    public boolean isSecure() {
+        return secure;
+    }
 
     @Override
     public boolean isAsyncStarted() { return false; }
@@ -406,4 +486,11 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     @Override
     public DispatcherType getDispatcherType() { return DispatcherType.REQUEST; }
+
+    public void setServerInfo(String serverName, int serverPort, boolean secure) {
+        this.serverName = serverName;
+        this.serverPort = serverPort;
+        this.secure = secure;
+        this.scheme = secure ? "https" : "http";
+    }
 }
