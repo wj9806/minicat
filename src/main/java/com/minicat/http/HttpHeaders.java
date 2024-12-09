@@ -100,15 +100,11 @@ public class HttpHeaders {
         StringBuilder currentHeaderValue = new StringBuilder();
         String currentHeaderName = null;
 
+        // 从第二行开始解析请求头（第一行是请求行）
         for (int i = 1; i < lines.length; i++) {
             String line = lines[i];
             if (line.isEmpty()) {
-                // 遇到空行，说明请求头部分结束
-                if (currentHeaderName != null && currentHeaderValue.length() > 0) {
-                    // 保存最后一个请求头
-                    addHeaderValues(headers, currentHeaderName, currentHeaderValue.toString().trim());
-                }
-                break;
+                break;  // 遇到空行，说明请求头部分结束
             }
 
             if (line.charAt(0) == ' ' || line.charAt(0) == '\t') {
@@ -117,9 +113,8 @@ public class HttpHeaders {
                     currentHeaderValue.append(" ").append(line.trim());
                 }
             } else {
-                // 新的请求头
+                // 新的请求头，先保存之前的请求头（如果有的话）
                 if (currentHeaderName != null && currentHeaderValue.length() > 0) {
-                    // 保存之前的请求头
                     addHeaderValues(headers, currentHeaderName, currentHeaderValue.toString().trim());
                 }
 
@@ -131,6 +126,12 @@ public class HttpHeaders {
                 }
             }
         }
+
+        // 保存最后一个请求头（如果有的话）
+        if (currentHeaderName != null && currentHeaderValue.length() > 0) {
+            addHeaderValues(headers, currentHeaderName, currentHeaderValue.toString().trim());
+        }
+
         return headers;
     }
 

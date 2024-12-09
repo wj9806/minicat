@@ -6,8 +6,7 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,7 +44,41 @@ public class JsonServlet extends HttpServlet {
         // 发送响应
         PrintWriter writer = resp.getWriter();
         writer.write(json);
-        //writer.flush();
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // 设置响应类型
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        // 读取请求体
+        StringBuilder requestBody = new StringBuilder();
+        try (BufferedReader reader = req.getReader()) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                requestBody.append(line);
+            }
+        }
+
+        // 创建响应数据
+        Map<String, Object> data = new HashMap<>();
+        data.put("message", "POST request processed successfully");
+        data.put("status", "success");
+        data.put("code", 200);
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("time", System.currentTimeMillis());
+        details.put("contentType", req.getContentType());
+        details.put("contentLength", req.getContentLength());
+        details.put("requestBody", requestBody.toString());
+        data.put("details", details);
+
+        // 转换为JSON字符串并发送响应
+        String json = toJson(data);
+        PrintWriter writer = resp.getWriter();
+        writer.write(json);
     }
 
     @SuppressWarnings("unchecked")
@@ -59,10 +92,10 @@ public class JsonServlet extends HttpServlet {
             }
             first = false;
             
-            json.append("\"").append(entry.getKey()).append("\":");
+            json.append("\"").append(escapeJsonString(entry.getKey())).append("\":");
             Object value = entry.getValue();
             if (value instanceof String) {
-                json.append("\"").append(value).append("\"");
+                json.append("\"").append(escapeJsonString((String)value)).append("\"");
             } else if (value instanceof Number) {
                 json.append(value);
             } else if (value instanceof Map) {
@@ -70,12 +103,54 @@ public class JsonServlet extends HttpServlet {
             } else if (value == null) {
                 json.append("null");
             } else {
-                json.append("\"").append(value).append("\"");
+                json.append("\"").append(escapeJsonString(value.toString())).append("\"");
             }
         }
         
         json.append("}");
         return json.toString();
+    }
+
+    private String escapeJsonString(String input) {
+        if (input == null) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+            switch (ch) {
+                case '"':
+                    result.append("\\\"");
+                    break;
+                case '\\':
+                    result.append("\\\\");
+                    break;
+                case '\b':
+                    result.append("\\b");
+                    break;
+                case '\f':
+                    result.append("\\f");
+                    break;
+                case '\n':
+                    result.append("\\n");
+                    break;
+                case '\r':
+                    result.append("\\r");
+                    break;
+                case '\t':
+                    result.append("\\t");
+                    break;
+                default:
+                    if (ch < ' ') {
+                        String hex = String.format("\\u%04x", (int) ch);
+                        result.append(hex);
+                    } else {
+                        result.append(ch);
+                    }
+                    break;
+            }
+        }
+        return result.toString();
     }
 
     @Override

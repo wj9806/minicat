@@ -9,11 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
-import javax.servlet.http.HttpServlet;
+import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
-import javax.servlet.http.HttpSessionAttributeListener;
-import javax.servlet.http.HttpSessionIdListener;
-import javax.servlet.http.HttpSessionListener;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -24,7 +21,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final String contextPath;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
     private final Map<String, String> initParameters = new HashMap<>();
-    private final Map<String, HttpServlet> servletMap = new HashMap<>();
+    private final Map<String, Servlet> servletMap = new HashMap<>();
     private final Map<String, String> servletUrlPatterns = new HashMap<>();
     private final Map<String, ServletRegistrationImpl> servletRegistrations = new HashMap<>();
     private final ServerConfig config;
@@ -40,7 +37,14 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         this.internalContext = new InternalContext();
     }
 
-    public HttpServlet findMatchingServlet(HttpServletRequest servletRequest) {
+    public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) {
+        HttpServletRequest servletRequest;
+        if (request instanceof HttpServletRequestWrapper) {
+            servletRequest = (HttpServletRequest)((HttpServletRequestWrapper)request).getRequest();
+        } else {
+            servletRequest = (HttpServletRequest)request;
+        }
+
         String path = servletRequest.getRequestURI();
         
         // 移除上下文路径
@@ -202,17 +206,17 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public Servlet getServlet(String name) throws ServletException {
-        return null;
+        return servletMap.get(name);
     }
 
     @Override
     public Enumeration<Servlet> getServlets() {
-        return null;
+        return Collections.enumeration(servletMap.values());
     }
 
     @Override
     public Enumeration<String> getServletNames() {
-        return null;
+        return Collections.enumeration(servletMap.keySet());
     }
 
     @Override
@@ -343,10 +347,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         }
 
         try {
-            if (servlet instanceof HttpServlet) {
-                servletMap.put(servletName, (HttpServlet) servlet);
-            }
-
+            servletMap.put(servletName, servlet);
             ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, servlet.getClass().getName(), this);
             servletRegistrations.put(servletName, registration);
             return registration;
@@ -525,9 +526,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     }
 
     private void destroyServlet() {
-        for (Map.Entry<String, HttpServlet> entry : servletMap.entrySet()) {
+        for (Map.Entry<String, Servlet> entry : servletMap.entrySet()) {
             try {
-                HttpServlet servlet = entry.getValue();
+                Servlet servlet = entry.getValue();
                 servlet.destroy();
             } catch (Exception e) {
                 logger.error("Error destroying servlet: " + e.getMessage());
@@ -546,8 +547,8 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         ServletRegistration.Dynamic registration = addServlet("default", staticServlet);
         registration.addMapping("/");
 
-        for (Map.Entry<String, HttpServlet> entry : servletMap.entrySet()) {
-            HttpServlet servlet = entry.getValue();
+        for (Map.Entry<String, Servlet> entry : servletMap.entrySet()) {
+            Servlet servlet = entry.getValue();
             servlet.init(new ServletConfig() {
                 @Override
                 public String getServletName() {

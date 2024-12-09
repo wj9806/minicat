@@ -1,12 +1,11 @@
 package com.minicat.server.processor;
 
-import com.minicat.http.HttpServletRequest;
-import com.minicat.http.HttpServletResponse;
-import com.minicat.http.HttpHeaders;
+import com.minicat.http.*;
 import com.minicat.core.ApplicationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
 import java.io.*;
 import java.net.Socket;
@@ -20,63 +19,45 @@ public class BioProcessor extends Processor {
     private static final Logger logger = LoggerFactory.getLogger(BioProcessor.class);
     private final ApplicationContext applicationContext;
     private final Socket socket;
-    
+
     public BioProcessor(ApplicationContext applicationContext, Socket socket) {
         this.applicationContext = applicationContext;
         this.socket = socket;
     }
-    
+
     @Override
     public void process() throws Exception {
-        InputStream inputStream;
-        OutputStream outputStream;
         try {
-            inputStream = socket.getInputStream();
-            outputStream = socket.getOutputStream();
+            OutputStream outputStream = socket.getOutputStream();
 
-            // 解析HTTP请求
-            StringBuilder requestBuilder = new StringBuilder();
-            byte[] buffer = new byte[1024];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                requestBuilder.append(new String(buffer, 0, len));
-                if (requestBuilder.toString().contains("\r\n\r\n")) {
-                    break;
-                }
+            // 创建Request和Response对象
+            javax.servlet.http.HttpServletRequest servletRequest = null;
+            try {
+                servletRequest = buildRequest(socket, applicationContext);
+            } catch (RequestParseException e) {
+                return;
             }
 
-            String request = requestBuilder.toString();
-            String[] lines = request.split("\r\n");
-            if (lines.length > 0) {
-                String[] requestLine = lines[0].split(" ");
-                if (requestLine.length >= 3) {
-                    String uri = requestLine[1];
-                    logger.debug("Received request for URI: {}", uri);
+            // 处理context-path
+            if (!applicationContext.getContextPath().isEmpty() && !servletRequest.getRequestURI().startsWith(applicationContext.getContextPath())) {
+                sendNotFoundResponse(outputStream);
+                return;
+            }
 
-                    // 处理context-path
-                    if (!applicationContext.getContextPath().isEmpty() && !uri.startsWith(applicationContext.getContextPath())) {
-                        sendNotFoundResponse(outputStream);
-                        return;
+            HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
+
+            // 查找匹配的Servlet
+            Servlet servlet = applicationContext.findMatchingServlet(servletRequest);
+
+            if (servlet != null) {
+                try {
+                    servlet.service(servletRequest, servletResponse);
+                    if (!servletResponse.isCommitted()) {
+                        servletResponse.flushBuffer();
                     }
-
-                    // 创建Request和Response对象
-                    HttpServletRequest servletRequest = buildRequest(socket, applicationContext, lines);
-                    HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
-
-                    // 查找匹配的Servlet
-                    HttpServlet servlet = applicationContext.findMatchingServlet(servletRequest);
-
-                    if (servlet != null) {
-                        try {
-                            servlet.service(servletRequest, servletResponse);
-                            if (!servletResponse.isCommitted()) {
-                                servletResponse.flushBuffer();
-                            }
-                        } catch (Exception e) {
-                            logger.error("Error processing request", e);
-                            sendErrorResponse(outputStream, e.getMessage());
-                        }
-                    }
+                } catch (Exception e) {
+                    logger.error("Error processing request", e);
+                    sendErrorResponse(outputStream, e.getMessage());
                 }
             }
         } catch (IOException e) {
@@ -84,20 +65,93 @@ public class BioProcessor extends Processor {
         }
     }
 
-    private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext, String[] lines) {
-        HttpServletRequest servletRequest = new HttpServletRequest(applicationContext, lines);
+    private javax.servlet.http.HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext) throws IOException {
+        InputStream inputStream = socket.getInputStream();
+        ByteArrayOutputStream headerOutputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream bodyOutputStream = new ByteArrayOutputStream();
 
-        // 解析并设置请求头
-        prepareHeaders(lines, servletRequest);
+        // 状态标记
+        boolean headersComplete = false;
+        int contentLength = -1;
+        HttpServletRequest servletRequest = null;
 
-        // 设置远程客户端信息
-        prepareRemoteInfo(socket, servletRequest);
+        byte[] buffer = new byte[1024];
+        int len;
+        int totalBodyRead = 0;
 
-        // 设置本地连接信息
-        prepareLocalInfo(socket, servletRequest);
+        // 读取并解析请求
+        while ((len = inputStream.read(buffer)) != -1) {
+            if (!headersComplete) {
+                // 还在处理请求头
+                headerOutputStream.write(buffer, 0, len);
+                String headers = headerOutputStream.toString(StandardCharsets.UTF_8.name());
+                int headerEnd = headers.indexOf("\r\n\r\n");
 
-        // 设置服务器信息
-        prepareServerInfo(socket, servletRequest);
+                if (headerEnd != -1) {
+                    // 找到请求头结束标记
+                    headersComplete = true;
+
+                    // 解析请求头部分
+                    String headerContent = headers.substring(0, headerEnd);
+                    String[] lines = headerContent.split("\r\n");
+
+                    // 创建request对象并设置基本信息
+                    servletRequest = new HttpServletRequest(applicationContext, lines);
+                    prepareHeaders(lines, servletRequest);
+                    prepareRemoteInfo(socket, servletRequest);
+                    prepareLocalInfo(socket, servletRequest);
+                    prepareServerInfo(socket, servletRequest);
+
+                    // 获取Content-Length
+                    contentLength = servletRequest.getIntHeader("Content-Length");
+                    if (contentLength <= 0) {
+                        break;  // 没有请求体，直接结束
+                    }
+
+                    // 处理已经读取的body部分
+                    int headerBytesLength = headerEnd + 4; // 包含\r\n\r\n
+                    int remainingInBuffer = headerOutputStream.size() - headerBytesLength;
+
+                    if (remainingInBuffer > 0) {
+                        bodyOutputStream.write(
+                            headerOutputStream.toByteArray(),
+                            headerBytesLength,
+                            remainingInBuffer
+                        );
+                        totalBodyRead += remainingInBuffer;
+
+                        if (totalBodyRead >= contentLength) {
+                            break;  // 已读完所需数据
+                        }
+                    }
+                }
+            } else {
+                // 处理请求体
+                int bytesToRead = Math.min(len, contentLength - totalBodyRead);
+                if (bytesToRead > 0) {
+                    bodyOutputStream.write(buffer, 0, bytesToRead);
+                    totalBodyRead += bytesToRead;
+
+                    if (totalBodyRead >= contentLength) {
+                        break;  // 已读完所需数据
+                    }
+                }
+            }
+        }
+
+        if (servletRequest == null) {
+            throw new RequestParseException("Invalid HTTP request: headers not found");
+        }
+
+        // 设置请求体
+        byte[] bodyContent = bodyOutputStream.size() > 0 ? bodyOutputStream.toByteArray() : new byte[0];
+        servletRequest.setBody(bodyContent);
+
+        // 如果是multipart请求，解析multipart内容
+        String contentType = servletRequest.getContentType();
+        if (contentType != null && contentType.startsWith("multipart/form-data")) {
+            return new MultipartHttpServletRequest(servletRequest);
+        }
 
         return servletRequest;
     }

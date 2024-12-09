@@ -1,7 +1,4 @@
-package com.minicat.server;
-
-import com.minicat.core.ApplicationContext;
-import com.minicat.core.ApplicationServletContext;
+package com.minicat.core;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletRegistration;

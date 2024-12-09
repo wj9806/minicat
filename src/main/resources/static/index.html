@@ -26,6 +26,7 @@
     <h1>Welcome to MiniCat!</h1>
     <p>This is a simple implementation of a web server.</p>
     <p>Try accessing the <a href="/hello.html?a=1&b=2">Hello Servlet</a></p>
+    <p>Try accessing the <a href="/upload.html">Upload Servlet</a></p>
     
     <div class="image-container">
         <h2>Test Image</h2>
@@ -35,6 +36,7 @@
     <div>
         <h2>Test JSON API</h2>
         <button onclick="fetchJson()">Fetch JSON Data</button>
+        <button onclick="fetchJson2()">Send POST Request</button>
         <div id="result" class="json-result"></div>
     </div>
 
@@ -48,6 +50,25 @@
                 .catch(error => {
                     document.getElementById('result').innerText = 'Error: ' + error.message;
                 });
+        }
+
+        function fetchJson2() {
+            fetch('/json/abc', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: "123"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerText = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').innerText = 'Error: ' + error.message;
+            });
         }
     </script>
 </body>

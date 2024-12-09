@@ -1,13 +1,13 @@
 package com.minicat.http;
 
 import com.minicat.core.ApplicationContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.security.Principal;
@@ -16,13 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpServletRequest implements javax.servlet.http.HttpServletRequest {
 
+    private static final Logger logger = LoggerFactory.getLogger(HttpServletRequest.class);
+
     //basic info
     private final String method;
     private final String protocol;
     private final String requestURI;
     private String queryString;
     private final HttpHeaders headers = new HttpHeaders();
-    private final Map<String, String[]> parameters = new HashMap<>();
+    final Map<String, String[]> parameters = new HashMap<>();
     private Charset charset;
     private boolean hasReadParameters;
     private String pathInfo;
@@ -49,8 +51,16 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     private String localName;
     private int localPort = -1;
 
+    //input stream
+    private RequestInputStream inputStream;
+    private BufferedReader reader;
+    byte[] body;
+
     public HttpServletRequest(ApplicationContext context, String[] lines) {
         String[] requestLine = lines[0].split(" ");
+
+        if (requestLine.length < 3) throw new RequestParseException("requestLine != 3");
+
         String method = requestLine[0];
         String requestURI = requestLine[1];
         String protocol = requestLine[2];
@@ -59,6 +69,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         this.protocol = protocol;
 
         // Parse URI and query string
+        logger.debug("Received request for URI: {}", requestURI);
         if (requestURI.contains("?")) {
             String[] parts = requestURI.split("\\?", 2);
             this.requestURI = parts[0];
@@ -309,10 +320,14 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     public void logout() { }
 
     @Override
-    public Collection<Part> getParts() { return null; }
+    public Collection<Part> getParts() throws IOException, ServletException {
+        throw new UnsupportedOperationException();
+    }
 
     @Override
-    public Part getPart(String name) { return null; }
+    public Part getPart(String name) throws IOException, ServletException {
+        throw new UnsupportedOperationException();
+    }
 
     @Override
     public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) { return null; }
@@ -359,20 +374,66 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         }
     }
 
-    @Override
-    public int getContentLength() { return 0; }
+    public void setBody(byte[] body) {
+        this.body = body;
+    }
 
     @Override
-    public long getContentLengthLong() { return 0; }
+    public ServletInputStream getInputStream() throws IOException {
+        if (reader != null) {
+            throw new IllegalStateException("getReader() has already been called for this request");
+        }
+        if (inputStream == null) {
+            inputStream = new RequestInputStream(new ByteArrayInputStream(body));
+        }
+        return inputStream;
+    }
 
     @Override
-    public String getContentType() { return null; }
+    public BufferedReader getReader() throws IOException {
+        if (inputStream != null && reader == null) {
+            throw new IllegalStateException("getInputStream() has already been called for this request");
+        }
+        if (reader == null) {
+            String encoding = getCharacterEncoding();
+            if (encoding == null) {
+                encoding = "ISO-8859-1";
+            }
+            reader = new BufferedReader(new InputStreamReader(getInputStream(), encoding));
+        }
+        return reader;
+    }
 
     @Override
-    public ServletInputStream getInputStream() { return null; }
+    public int getContentLength() {
+        String contentLength = getHeader("Content-Length");
+        if (contentLength != null) {
+            try {
+                return Integer.parseInt(contentLength);
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+        return -1;
+    }
 
     @Override
-    public BufferedReader getReader() { return null; }
+    public long getContentLengthLong() {
+        String contentLength = getHeader("Content-Length");
+        if (contentLength != null) {
+            try {
+                return Long.parseLong(contentLength);
+            } catch (NumberFormatException e) {
+                return -1L;
+            }
+        }
+        return -1L;
+    }
+
+    @Override
+    public String getContentType() {
+        return getHeader("Content-Type");
+    }
 
     @Override
     public String getLocalAddr() {
