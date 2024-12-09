@@ -1,6 +1,7 @@
 package com.minicat.http;
 
 import com.minicat.core.ApplicationContext;
+import com.minicat.core.ServletWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,8 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     private String pathInfo;
     private String servletPath;
 
+    //servlet info
+    private ServletWrapper servletWrapper;
     private ServletContext servletContext;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
@@ -131,6 +134,14 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         } catch (Exception e) {
             return value;
         }
+    }
+
+    public void setServletWrapper(Servlet servlet) {
+        this.servletWrapper = (ServletWrapper) servlet;
+    }
+
+    public ServletWrapper getServletWrapper() {
+        return servletWrapper;
     }
 
     public void setServletContext(ApplicationContext applicationContext) {

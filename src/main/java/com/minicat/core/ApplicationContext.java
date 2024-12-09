@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import java.io.InputStream;
@@ -62,7 +63,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (servletName != null) {
             servletRequest.setServletPath(path);
             servletRequest.setPathInfo(null);
-            return servletMap.get(servletName);
+            Servlet servlet = servletMap.get(servletName);
+            servletRequest.setServletWrapper(servlet);
+            return servlet;
         }
 
         // 2. 最长路径前缀匹配 (/xxx/*)
@@ -76,7 +79,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             } else {
                 servletRequest.setPathInfo(null);
             }
-            return servletMap.get(matchedEntry.getValue());
+            Servlet servlet = servletMap.get(matchedEntry.getValue());
+            servletRequest.setServletWrapper(servlet);
+            return servlet;
         }
 
         // 3. 扩展名匹配 (*.xxx)
@@ -87,7 +92,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             if (servletName != null) {
                 servletRequest.setServletPath(path);
                 servletRequest.setPathInfo(null);
-                return servletMap.get(servletName);
+                Servlet servlet = servletMap.get(servletName);
+                servletRequest.setServletWrapper(servlet);
+                return servlet;
             }
         }
 
@@ -96,13 +103,17 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (servletName != null) {
             servletRequest.setServletPath("");
             servletRequest.setPathInfo(path);
-            return servletMap.get(servletName);
+            Servlet servlet = servletMap.get(servletName);
+            servletRequest.setServletWrapper(servlet);
+            return servlet;
         }
 
         // 5. 未匹配
         servletRequest.setServletPath("");
         servletRequest.setPathInfo(null);
-        return servletMap.get("default");
+        Servlet servlet = servletMap.get("default");
+        servletRequest.setServletWrapper(servlet);
+        return servlet;
     }
 
     private Map.Entry<String, String> getMatchedPatternAndServlet(String path) {
@@ -133,12 +144,12 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public int getMajorVersion() {
-        return 0;
+        return 3;
     }
 
     @Override
     public int getMinorVersion() {
-        return 0;
+        return 1;
     }
 
     @Override
@@ -347,9 +358,16 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         }
 
         try {
-            servletMap.put(servletName, servlet);
             ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, servlet.getClass().getName(), this);
+            MultipartConfig annotation = servlet.getClass().getAnnotation(MultipartConfig.class);
+            if (annotation != null) {
+                MultipartConfigElement element = new MultipartConfigElement(annotation);
+                registration.setMultipartConfig(element);
+            }
+
             servletRegistrations.put(servletName, registration);
+
+            servletMap.put(servletName, new ServletWrapper(servlet, registration));
             return registration;
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize servlet: " + servletName, e);

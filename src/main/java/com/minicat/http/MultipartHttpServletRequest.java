@@ -1,5 +1,6 @@
 package com.minicat.http;
 
+import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -24,9 +25,9 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     private Map<String, Part> parts;
     private String boundary;
     private boolean multipartResolved;
-    private final com.minicat.http.HttpServletRequest request;
-    private javax.servlet.MultipartConfigElement multipartConfig;
     private long totalSize;
+
+    private final com.minicat.http.HttpServletRequest request;
 
     /**
      * Constructs a request object wrapping the given request.
@@ -37,18 +38,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     public MultipartHttpServletRequest(HttpServletRequest request) {
         super(request);
         this.request = (com.minicat.http.HttpServletRequest) request;
-        // 设置默认的multipart配置
-        this.multipartConfig = new javax.servlet.MultipartConfigElement(
-            System.getProperty("java.io.tmpdir"),  // 临时文件目录
-            -1L,  // maxFileSize
-            -1L,  // maxRequestSize
-            0     // fileSizeThreshold
-        );
         this.totalSize = 0;
-    }
-
-    public void setMultipartConfig(javax.servlet.MultipartConfigElement multipartConfig) {
-        this.multipartConfig = multipartConfig;
     }
 
     @Override
@@ -254,6 +244,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     }
 
     private void addPart(String name, String fileName, Map<String, String> headers, byte[] content) {
+        MultipartConfigElement multipartConfig = request.getServletWrapper().getRegistration().getMultipartConfig();
         // 检查文件大小限制
         if (fileName != null && multipartConfig.getMaxFileSize() > 0 && content.length > multipartConfig.getMaxFileSize()) {
             throw new RequestParseException(String.format(

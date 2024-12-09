@@ -5,10 +5,16 @@ import java.io.IOException;
 
 public class ServletWrapper implements Servlet {
 
-    private Servlet servlet;
+    private final Servlet servlet;
+    private final ServletRegistrationImpl registration;
 
-    public ServletWrapper(Servlet servlet) {
+    public ServletWrapper(Servlet servlet, ServletRegistrationImpl registration) {
         this.servlet = servlet;
+        this.registration = registration;
+    }
+
+    public ServletRegistrationImpl getRegistration() {
+        return registration;
     }
 
     @Override
