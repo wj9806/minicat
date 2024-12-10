@@ -27,7 +27,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     private boolean multipartResolved;
     private long totalSize;
 
-    private final com.minicat.http.HttpServletRequest request;
+    private final ApplicationRequest request;
 
     /**
      * Constructs a request object wrapping the given request.
@@ -37,7 +37,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
      */
     public MultipartHttpServletRequest(HttpServletRequest request) {
         super(request);
-        this.request = (com.minicat.http.HttpServletRequest) request;
+        this.request = (ApplicationRequest) request;
         this.totalSize = 0;
     }
 

@@ -2,13 +2,14 @@ package com.minicat.http;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class HttpServletResponse implements javax.servlet.http.HttpServletResponse {
+public class ApplicationResponse implements HttpServletResponse {
 
     //socket 输出流
     private final OutputStream socketStream;
@@ -25,7 +26,7 @@ public class HttpServletResponse implements javax.servlet.http.HttpServletRespon
     private boolean committed = false;
     private int bufferSize = 8192; // 默认8KB缓冲区
 
-    public HttpServletResponse(OutputStream socketStream) {
+    public ApplicationResponse(OutputStream socketStream) {
         this.socketStream = socketStream;
         this.bodyBuffer = new ByteArrayOutputStream(bufferSize);
     }

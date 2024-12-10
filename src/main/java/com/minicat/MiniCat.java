@@ -1,5 +1,6 @@
 package com.minicat;
 
+import com.minicat.example.FormServlet;
 import com.minicat.example.HelloServlet;
 import com.minicat.example.JsonServlet;
 import com.minicat.example.MultipartServlet;
@@ -31,6 +32,7 @@ public class MiniCat {
 
     public static void main(String[] args) {
         MiniCat miniCat = new MiniCat();
+        miniCat.server.addServlet(new FormServlet(), "/form");
         miniCat.server.addServlet(new MultipartServlet(), "/file/upload");
         miniCat.server.addServlet(new HelloServlet(), "/hello.html");
         miniCat.server.addServlet(new JsonServlet(), "/json", "/json2", "/json/*");

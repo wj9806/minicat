@@ -15,9 +15,9 @@ import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class HttpServletRequest implements javax.servlet.http.HttpServletRequest {
+public class ApplicationRequest implements HttpServletRequest {
 
-    private static final Logger logger = LoggerFactory.getLogger(HttpServletRequest.class);
+    private static final Logger logger = LoggerFactory.getLogger(ApplicationRequest.class);
 
     //basic info
     private final String method;
@@ -59,7 +59,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
     private BufferedReader reader;
     byte[] body;
 
-    public HttpServletRequest(ApplicationContext context, String[] lines) {
+    public ApplicationRequest(ApplicationContext context, String[] lines) {
         String[] requestLine = lines[0].split(" ");
 
         if (requestLine.length < 3) throw new RequestParseException("requestLine != 3");
@@ -77,7 +77,6 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
             String[] parts = requestURI.split("\\?", 2);
             this.requestURI = parts[0];
             this.queryString = parts[1];
-            parseParameters(this.queryString);
         } else {
             this.requestURI = requestURI;
         }
@@ -97,29 +96,52 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
         }
     }
 
-    private void parseParameters(String queryString) {
-        if (queryString == null || queryString.trim().isEmpty()) {
-            return;
-        }
+    private void parseParameters() {
+        if (hasReadParameters) return;
+
+        doParseParameters(this.queryString);
+
         hasReadParameters = true;
 
-        String[] pairs = queryString.split("&");
-        for (String pair : pairs) {
-            if (pair.trim().isEmpty()) {
-                continue;
+        String contentType = getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+            return;
+        }
+
+        if ("POST".equalsIgnoreCase(method)) {
+            try {
+                String encoding = getCharacterEncoding();
+                if (encoding == null) {
+                    encoding = "ISO-8859-1";
+                }
+                String bodyStr = new String(body, encoding);
+                doParseParameters(bodyStr);
+            } catch (Exception e) {
+                logger.error("Failed to parse form parameters", e);
             }
+        }
+    }
 
-            String[] keyValue = pair.split("=", 2);
-            String key = decodeUrlParameter(keyValue[0]);
-            String value = keyValue.length > 1 ? decodeUrlParameter(keyValue[1]) : "";
+    private void doParseParameters(String param) {
+        if (param != null && !param.trim().isEmpty()) {
+            String[] pairs = param.split("&");
+            for (String pair : pairs) {
+                if (pair.trim().isEmpty()) {
+                    continue;
+                }
 
-            String[] values = parameters.get(key);
-            if (values == null) {
-                parameters.put(key, new String[]{value});
-            } else {
-                String[] newValues = Arrays.copyOf(values, values.length + 1);
-                newValues[values.length] = value;
-                parameters.put(key, newValues);
+                String[] keyValue = pair.split("=", 2);
+                String key = decodeUrlParameter(keyValue[0]);
+                String value = keyValue.length > 1 ? decodeUrlParameter(keyValue[1]) : "";
+
+                String[] values = parameters.get(key);
+                if (values == null) {
+                    parameters.put(key, new String[]{value});
+                } else {
+                    String[] newValues = Arrays.copyOf(values, values.length + 1);
+                    newValues[values.length] = value;
+                    parameters.put(key, newValues);
+                }
             }
         }
     }
@@ -170,22 +192,26 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
 
     @Override
     public String getParameter(String name) {
+        parseParameters();
         String[] values = parameters.get(name);
         return values != null && values.length > 0 ? values[0] : null;
     }
 
     @Override
     public Map<String, String[]> getParameterMap() {
+        parseParameters();
         return Collections.unmodifiableMap(parameters);
     }
 
     @Override
     public Enumeration<String> getParameterNames() {
+        parseParameters();
         return Collections.enumeration(parameters.keySet());
     }
 
     @Override
     public String[] getParameterValues(String name) {
+        parseParameters();
         return parameters.get(name);
     }
 
@@ -395,7 +421,7 @@ public class HttpServletRequest implements javax.servlet.http.HttpServletRequest
             throw new IllegalStateException("getReader() has already been called for this request");
         }
         if (inputStream == null) {
-            inputStream = new RequestInputStream(new ByteArrayInputStream(body));
+            inputStream = new RequestInputStream(body);
         }
         return inputStream;
     }

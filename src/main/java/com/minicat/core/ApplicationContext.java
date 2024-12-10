@@ -1,6 +1,6 @@
 package com.minicat.core;
 
-import com.minicat.http.HttpServletRequest;
+import com.minicat.http.ApplicationRequest;
 import com.minicat.server.*;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.event.EventType;
@@ -39,11 +39,11 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     }
 
     public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) {
-        HttpServletRequest servletRequest;
+        ApplicationRequest servletRequest;
         if (request instanceof HttpServletRequestWrapper) {
-            servletRequest = (HttpServletRequest)((HttpServletRequestWrapper)request).getRequest();
+            servletRequest = (ApplicationRequest)((HttpServletRequestWrapper)request).getRequest();
         } else {
-            servletRequest = (HttpServletRequest)request;
+            servletRequest = (ApplicationRequest)request;
         }
 
         String path = servletRequest.getRequestURI();

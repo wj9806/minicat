@@ -2,6 +2,7 @@ package com.minicat.http;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -12,6 +13,11 @@ public class RequestInputStream extends ServletInputStream {
 
     public RequestInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
+        this.finished = false;
+    }
+
+    public RequestInputStream(byte[] data) {
+        this.inputStream = new ByteArrayInputStream(data);
         this.finished = false;
     }
 

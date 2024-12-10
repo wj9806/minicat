@@ -6,7 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.Servlet;
-import javax.servlet.http.HttpServlet;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,7 @@ public class BioProcessor extends Processor {
             OutputStream outputStream = socket.getOutputStream();
 
             // 创建Request和Response对象
-            javax.servlet.http.HttpServletRequest servletRequest = null;
+            HttpServletRequest servletRequest = null;
             try {
                 servletRequest = buildRequest(socket, applicationContext);
             } catch (RequestParseException e) {
@@ -44,7 +45,7 @@ public class BioProcessor extends Processor {
                 return;
             }
 
-            HttpServletResponse servletResponse = new HttpServletResponse(outputStream);
+            ServletResponse servletResponse = new ApplicationResponse(outputStream);
 
             // 查找匹配的Servlet
             Servlet servlet = applicationContext.findMatchingServlet(servletRequest);
@@ -65,7 +66,7 @@ public class BioProcessor extends Processor {
         }
     }
 
-    private javax.servlet.http.HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext) throws IOException {
+    private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext) throws IOException {
         InputStream inputStream = socket.getInputStream();
         ByteArrayOutputStream headerOutputStream = new ByteArrayOutputStream();
         ByteArrayOutputStream bodyOutputStream = new ByteArrayOutputStream();
@@ -73,7 +74,7 @@ public class BioProcessor extends Processor {
         // 状态标记
         boolean headersComplete = false;
         int contentLength = -1;
-        HttpServletRequest servletRequest = null;
+        ApplicationRequest servletRequest = null;
 
         byte[] buffer = new byte[1024];
         int len;
@@ -96,7 +97,7 @@ public class BioProcessor extends Processor {
                     String[] lines = headerContent.split("\r\n");
 
                     // 创建request对象并设置基本信息
-                    servletRequest = new HttpServletRequest(applicationContext, lines);
+                    servletRequest = new ApplicationRequest(applicationContext, lines);
                     prepareHeaders(lines, servletRequest);
                     prepareRemoteInfo(socket, servletRequest);
                     prepareLocalInfo(socket, servletRequest);
@@ -149,21 +150,23 @@ public class BioProcessor extends Processor {
 
         // 如果是multipart请求，解析multipart内容
         String contentType = servletRequest.getContentType();
-        if (contentType != null && contentType.startsWith("multipart/form-data")) {
-            return new MultipartHttpServletRequest(servletRequest);
+        if (contentType != null) {
+            if (contentType.startsWith("multipart/form-data")) {
+                return new MultipartHttpServletRequest(servletRequest);
+            }
         }
 
         return servletRequest;
     }
 
-    private void prepareLocalInfo(Socket socket, HttpServletRequest servletRequest) {
+    private void prepareLocalInfo(Socket socket, ApplicationRequest servletRequest) {
         String localAddr = socket.getLocalAddress().getHostAddress();
         String localName = socket.getLocalAddress().getHostName();
         int localPort = socket.getLocalPort();
         servletRequest.setLocalInfo(localAddr, localName, localPort);
     }
 
-    private void prepareServerInfo(Socket socket, HttpServletRequest servletRequest) {
+    private void prepareServerInfo(Socket socket, ApplicationRequest servletRequest) {
         String serverName = "localhost";
         int serverPort = 8080;
         boolean isSecure;
@@ -198,7 +201,7 @@ public class BioProcessor extends Processor {
         servletRequest.setServerInfo(serverName, serverPort, isSecure);
     }
 
-    private void prepareRemoteInfo(Socket socket, HttpServletRequest servletRequest) {
+    private void prepareRemoteInfo(Socket socket, ApplicationRequest servletRequest) {
         servletRequest.setRemoteAddr(socket.getInetAddress().getHostAddress());
         servletRequest.setRemoteHost(socket.getInetAddress().getHostName());
         servletRequest.setRemotePort(socket.getPort());
@@ -225,7 +228,7 @@ public class BioProcessor extends Processor {
         }
     }
 
-    private void prepareHeaders(String[] lines, HttpServletRequest servletRequest) {
+    private void prepareHeaders(String[] lines, ApplicationRequest servletRequest) {
         HttpHeaders headers = HttpHeaders.parse(lines);
         servletRequest.setHeaders(headers);
     }
