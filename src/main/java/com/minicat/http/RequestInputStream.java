@@ -11,11 +11,6 @@ public class RequestInputStream extends ServletInputStream {
     private boolean finished;
     private ReadListener readListener;
 
-    public RequestInputStream(InputStream inputStream) {
-        this.inputStream = inputStream;
-        this.finished = false;
-    }
-
     public RequestInputStream(byte[] data) {
         this.inputStream = new ByteArrayInputStream(data);
         this.finished = false;

@@ -78,7 +78,8 @@ public class StaticResourceServlet extends HttpServlet {
                 // 资源不在缓存中，尝试加载
                 try (InputStream resourceStream = getClass().getResourceAsStream(resourcePath)) {
                     if (resourceStream == null) {
-                        resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Resource not found: " + uri);
+                        resp.sendError(HttpServletResponse.SC_NOT_FOUND,
+                                "<h1>404 Not Found</h1><p>No mapping for URL: " + uri + "</p>");
                         return;
                     }
                     cachedResource = loadAndCacheResource(resourcePath, resourceStream);

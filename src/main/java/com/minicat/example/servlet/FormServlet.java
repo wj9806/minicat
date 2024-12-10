@@ -1,4 +1,6 @@
-package com.minicat.example;
+package com.minicat.example.servlet;
+
+import com.minicat.example.JSON;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -14,7 +16,7 @@ public class FormServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
-            throws ServletException, IOException {
+            throws IOException {
         // 获取表单参数
         req.setCharacterEncoding(StandardCharsets.UTF_8.name());
         String username = req.getParameter("username");

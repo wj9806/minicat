@@ -1,9 +1,11 @@
 package com.minicat;
 
-import com.minicat.example.FormServlet;
-import com.minicat.example.HelloServlet;
-import com.minicat.example.JsonServlet;
-import com.minicat.example.MultipartServlet;
+import com.minicat.example.filter.LoggingFilter;
+import com.minicat.example.filter.TestFilter;
+import com.minicat.example.servlet.FormServlet;
+import com.minicat.example.servlet.HelloServlet;
+import com.minicat.example.servlet.JsonServlet;
+import com.minicat.example.servlet.MultipartServlet;
 import com.minicat.server.HttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,9 @@ public class MiniCat {
         miniCat.server.addServlet(new MultipartServlet(), "/file/upload");
         miniCat.server.addServlet(new HelloServlet(), "/hello.html");
         miniCat.server.addServlet(new JsonServlet(), "/json", "/json2", "/json/*");
+
+        miniCat.server.addFilter(new LoggingFilter(), "/*");
+        miniCat.server.addFilter(new TestFilter(), "/");
         miniCat.start();
     }
 }

@@ -6,5 +6,8 @@ package com.minicat.core.event;
 public enum EventType {
     ATTRIBUTE_ADDED,
     ATTRIBUTE_REMOVED,
-    ATTRIBUTE_REPLACED
+    ATTRIBUTE_REPLACED,
+
+    REQUEST_DESTROYED,
+    REQUEST_INITIALIZED
 }

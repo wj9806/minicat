@@ -32,7 +32,6 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     /**
      * Constructs a request object wrapping the given request.
      *
-     * @param request
      * @throws IllegalArgumentException if the request is null
      */
     public MultipartHttpServletRequest(HttpServletRequest request) {
@@ -244,7 +243,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
     }
 
     private void addPart(String name, String fileName, Map<String, String> headers, byte[] content) {
-        MultipartConfigElement multipartConfig = request.getServletWrapper().getRegistration().getMultipartConfig();
+        MultipartConfigElement multipartConfig = request.getServletRegistration().getMultipartConfig();
         // 检查文件大小限制
         if (fileName != null && multipartConfig.getMaxFileSize() > 0 && content.length > multipartConfig.getMaxFileSize()) {
             throw new RequestParseException(String.format(

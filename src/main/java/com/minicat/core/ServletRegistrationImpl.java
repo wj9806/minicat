@@ -1,68 +1,45 @@
 package com.minicat.core;
 
-import javax.servlet.MultipartConfigElement;
-import javax.servlet.ServletRegistration;
-import javax.servlet.ServletSecurityElement;
+import javax.servlet.*;
+import javax.servlet.annotation.MultipartConfig;
+import javax.servlet.annotation.WebServlet;
 import java.util.*;
 
-public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
-    private final String servletName;
-    private final String className;
+public class ServletRegistrationImpl extends RegistrationBase implements ServletRegistration.Dynamic {
+    private final Servlet servlet;
     private final ApplicationContext applicationContext;
-    private final Map<String, String> initParameters = new HashMap<>();
     private final Set<String> mappings = new HashSet<>();
     private int loadOnStartup = -1;
     private String runAsRole;
     private boolean asyncSupported = false;
     private MultipartConfigElement multipartConfig;
+    private final ServletConfigImpl servletConfig;
 
-    public ServletRegistrationImpl(String servletName, String className, ApplicationContext applicationContext) {
-        this.servletName = servletName;
-        this.className = className;
+    public ServletRegistrationImpl(String servletName, Servlet servlet,
+                                   ApplicationContext applicationContext, ServletConfigImpl servletConfig) {
+        super(servletName, servlet.getClass().getName());
         this.applicationContext = applicationContext;
-    }
+        this.servlet = servlet;
+        this.servletConfig = servletConfig;
 
-    @Override
-    public String getName() {
-        return servletName;
-    }
+        WebServlet webServlet = servlet.getClass().getAnnotation(WebServlet.class);
+        if (webServlet != null)
+            handleWebInitParams(webServlet.initParams());
+        servletConfig.setInitParameters(getInitParameters());
 
-    @Override
-    public String getClassName() {
-        return className;
-    }
-
-    @Override
-    public boolean setInitParameter(String name, String value) {
-        if (name == null || value == null) {
-            throw new IllegalArgumentException("Init parameter name or value cannot be null");
+        MultipartConfig multipartConfig = servlet.getClass().getAnnotation(MultipartConfig.class);
+        if (multipartConfig != null) {
+            MultipartConfigElement element = new MultipartConfigElement(multipartConfig);
+            this.setMultipartConfig(element);
         }
-        if (initParameters.containsKey(name)) {
-            return false;
-        }
-        initParameters.put(name, value);
-        return true;
     }
 
-    @Override
-    public String getInitParameter(String name) {
-        return initParameters.get(name);
+    public Servlet getServlet() {
+        return servlet;
     }
 
-    @Override
-    public Set<String> setInitParameters(Map<String, String> initParameters) {
-        Set<String> conflicts = new HashSet<>();
-        for (Map.Entry<String, String> entry : initParameters.entrySet()) {
-            if (!setInitParameter(entry.getKey(), entry.getValue())) {
-                conflicts.add(entry.getKey());
-            }
-        }
-        return conflicts;
-    }
-
-    @Override
-    public Map<String, String> getInitParameters() {
-        return Collections.unmodifiableMap(initParameters);
+    public ServletConfigImpl getServletConfig() {
+        return servletConfig;
     }
 
     @Override
@@ -90,7 +67,7 @@ public class ServletRegistrationImpl implements ServletRegistration.Dynamic {
         // 如果没有冲突，添加映射
         if (conflicts.isEmpty()) {
             for (String pattern : urlPatterns) {
-                ((ApplicationServletContext) applicationContext).addServletMapping(servletName, pattern);
+                ((ApplicationServletContext) applicationContext).addServletMapping(name, pattern);
             }
         }
 

@@ -1,5 +1,6 @@
-package com.minicat.example;
+package com.minicat.example.servlet;
 
+import com.minicat.example.JSON;
 import com.minicat.server.HttpServlet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,7 @@ public class JsonServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) 
-            throws ServletException, IOException {
+            throws IOException {
         // 设置响应类型为application/json
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
@@ -48,7 +49,7 @@ public class JsonServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException {
+            throws IOException {
         // 设置响应类型
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");

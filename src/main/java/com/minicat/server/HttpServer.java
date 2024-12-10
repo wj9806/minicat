@@ -10,8 +10,12 @@ import com.minicat.util.BannerPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.DispatcherType;
+import javax.servlet.Filter;
+import javax.servlet.FilterRegistration;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServlet;
+import java.util.EnumSet;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -168,5 +172,22 @@ public class HttpServer implements Lifecycle {
 
         // 添加映射
         registration.addMapping(urls);
+    }
+
+    public void addFilter(Filter filter, String... urls) {
+        String className = filter.getClass().getSimpleName();
+        String filterName = "filter_" + className;
+
+        FilterRegistration.Dynamic registration = applicationContext.addFilter(filterName, filter);
+        if (registration == null) {
+            // 如果返回 null，说明该名称已存在
+            logger.warn("Failed to add filter: name='{}', class='{}'", filterName, className);
+            return;
+        }
+
+        logger.debug("Adding filter: name='{}', class='{}', urls='{}'", filterName, className, String.join(",", urls));
+
+        // 添加映射
+        registration.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, urls);
     }
 }

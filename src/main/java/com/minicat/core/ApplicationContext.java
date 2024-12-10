@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
-import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import java.io.InputStream;
@@ -17,16 +16,20 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class ApplicationContext implements javax.servlet.ServletContext, ApplicationServletContext, Lifecycle {
     private final String contextPath;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
     private final Map<String, String> initParameters = new HashMap<>();
-    private final Map<String, Servlet> servletMap = new HashMap<>();
+
     private final Map<String, String> servletUrlPatterns = new HashMap<>();
     private final Map<String, ServletRegistrationImpl> servletRegistrations = new HashMap<>();
+
+    private final Map<String, FilterRegistrationImpl> filterRegistrations = new HashMap<>();
+    private final List<FilterRegistrationImpl> filterChain = new ArrayList<>();
+
     private final ServerConfig config;
-    private final String serverInfo = "MiniCat/1.0";
     private final String staticPath;
     private final InternalContext internalContext;
     private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
@@ -63,8 +66,10 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (servletName != null) {
             servletRequest.setServletPath(path);
             servletRequest.setPathInfo(null);
-            Servlet servlet = servletMap.get(servletName);
-            servletRequest.setServletWrapper(servlet);
+
+            ServletRegistrationImpl registration = servletRegistrations.get(servletName);
+            Servlet servlet = registration.getServlet();
+            servletRequest.setServletRegistration(registration);
             return servlet;
         }
 
@@ -79,8 +84,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             } else {
                 servletRequest.setPathInfo(null);
             }
-            Servlet servlet = servletMap.get(matchedEntry.getValue());
-            servletRequest.setServletWrapper(servlet);
+            ServletRegistrationImpl registration = servletRegistrations.get(matchedEntry.getValue());
+            Servlet servlet = registration.getServlet();
+            servletRequest.setServletRegistration(registration);
             return servlet;
         }
 
@@ -92,8 +98,9 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             if (servletName != null) {
                 servletRequest.setServletPath(path);
                 servletRequest.setPathInfo(null);
-                Servlet servlet = servletMap.get(servletName);
-                servletRequest.setServletWrapper(servlet);
+                ServletRegistrationImpl registration = servletRegistrations.get(servletName);
+                Servlet servlet = registration.getServlet();
+                servletRequest.setServletRegistration(registration);
                 return servlet;
             }
         }
@@ -103,16 +110,18 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (servletName != null) {
             servletRequest.setServletPath("");
             servletRequest.setPathInfo(path);
-            Servlet servlet = servletMap.get(servletName);
-            servletRequest.setServletWrapper(servlet);
+            ServletRegistrationImpl registration = servletRegistrations.get(servletName);
+            Servlet servlet = registration.getServlet();
+            servletRequest.setServletRegistration(registration);
             return servlet;
         }
 
         // 5. 未匹配
         servletRequest.setServletPath("");
         servletRequest.setPathInfo(null);
-        Servlet servlet = servletMap.get("default");
-        servletRequest.setServletWrapper(servlet);
+        ServletRegistrationImpl registration = servletRegistrations.get("default");
+        Servlet servlet = registration.getServlet();
+        servletRequest.setServletRegistration(registration);
         return servlet;
     }
 
@@ -217,17 +226,20 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public Servlet getServlet(String name) throws ServletException {
-        return servletMap.get(name);
+        ServletRegistrationImpl servletRegistration = servletRegistrations.get(name);
+        return servletRegistration == null ? null : servletRegistration.getServlet();
     }
 
     @Override
     public Enumeration<Servlet> getServlets() {
-        return Collections.enumeration(servletMap.values());
+        List<Servlet> servlets = servletRegistrations.values().stream()
+                .map(ServletRegistrationImpl::getServlet).collect(Collectors.toList());
+        return Collections.enumeration(servlets);
     }
 
     @Override
     public Enumeration<String> getServletNames() {
-        return Collections.enumeration(servletMap.keySet());
+        return Collections.enumeration(servletRegistrations.keySet());
     }
 
     @Override
@@ -255,7 +267,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public String getServerInfo() {
-        return serverInfo;
+        return "MiniCat" + Version.VERSION;
     }
 
     @Override
@@ -300,11 +312,11 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         // 发布事件
         if (oldValue == null) {
             // 新增属性
-            internalContext.publishEvent(new ServletContextAttributeEventObject(
+            publishEvent(new ServletContextAttributeEventObject(
                 this, name, object, EventType.ATTRIBUTE_ADDED));
         } else if (!object.equals(oldValue)) {
             // 修改属性
-            internalContext.publishEvent(new ServletContextAttributeEventObject(
+            publishEvent(new ServletContextAttributeEventObject(
                 this, name, oldValue, EventType.ATTRIBUTE_REPLACED));
         }
     }
@@ -314,7 +326,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         Object oldValue = attributes.remove(name);
         if (oldValue != null) {
             // 删除属性
-            internalContext.publishEvent(new ServletContextAttributeEventObject(
+            publishEvent(new ServletContextAttributeEventObject(
                 this, name, oldValue, EventType.ATTRIBUTE_REMOVED));
         }
     }
@@ -358,16 +370,10 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         }
 
         try {
-            ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, servlet.getClass().getName(), this);
-            MultipartConfig annotation = servlet.getClass().getAnnotation(MultipartConfig.class);
-            if (annotation != null) {
-                MultipartConfigElement element = new MultipartConfigElement(annotation);
-                registration.setMultipartConfig(element);
-            }
-
+            ServletConfigImpl servletConfig = new ServletConfigImpl(servletName, this);
+            ServletRegistrationImpl registration = new ServletRegistrationImpl(servletName, servlet,
+                    this, servletConfig);
             servletRegistrations.put(servletName, registration);
-
-            servletMap.put(servletName, new ServletWrapper(servlet, registration));
             return registration;
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize servlet: " + servletName, e);
@@ -417,32 +423,96 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, String className) {
-        return null;
+        if (filterName == null || className == null) {
+            throw new IllegalArgumentException("Filter name or class name cannot be null");
+        }
+
+        if (filterRegistrations.containsKey(filterName)) {
+            return null;
+        }
+
+        try {
+            Class<?> clazz = Class.forName(className);
+            if (!Filter.class.isAssignableFrom(clazz)) {
+                throw new IllegalArgumentException("Class " + className + " is not a Filter");
+            }
+
+            Filter filter = (Filter) clazz.getConstructor().newInstance();
+            return addFilter(filterName, filter);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to instantiate filter: " + className, e);
+        }
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, Filter filter) {
-        return null;
+        if (filterName == null || filter == null) {
+            throw new IllegalArgumentException("Filter name or filter instance cannot be null");
+        }
+
+        if (filterRegistrations.containsKey(filterName)) {
+            return null;
+        }
+
+        FilterConfigImpl filterConfig = new FilterConfigImpl(filterName, this);
+        FilterRegistrationImpl registration = new FilterRegistrationImpl(filterName, filter, filterConfig);
+        filterRegistrations.put(filterName, registration);
+        filterChain.add(registration);
+        return registration;
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, Class<? extends Filter> filterClass) {
-        return null;
+        if (filterName == null || filterClass == null) {
+            throw new IllegalArgumentException("Filter name or filter class cannot be null");
+        }
+
+        if (filterRegistrations.containsKey(filterName)) {
+            return null;
+        }
+
+        try {
+            Filter filter = filterClass.getConstructor().newInstance();
+            return addFilter(filterName, filter);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to instantiate filter: " + filterClass.getName(), e);
+        }
     }
 
     @Override
     public <T extends Filter> T createFilter(Class<T> clazz) throws ServletException {
-        return null;
+        if (clazz == null) {
+            throw new IllegalArgumentException("Filter class cannot be null");
+        }
+
+        try {
+            return clazz.getConstructor().newInstance();
+        } catch (Exception e) {
+            throw new ServletException("Failed to instantiate filter", e);
+        }
     }
 
     @Override
-    public FilterRegistration getFilterRegistration(String filterName) {
-        return null;
+    public FilterRegistrationImpl getFilterRegistration(String filterName) {
+        return filterRegistrations.get(filterName);
     }
 
     @Override
-    public Map<String, ? extends FilterRegistration> getFilterRegistrations() {
-        return null;
+    public Map<String, ? extends FilterRegistrationImpl> getFilterRegistrations() {
+        return Collections.unmodifiableMap(filterRegistrations);
+    }
+
+    public FilterChain buildFilterChain(HttpServletRequest request, Servlet servlet) {
+        String requestURI = request.getRequestURI();
+        List<Filter> matchedFilters = new ArrayList<>();
+        
+        for (FilterRegistrationImpl registration : filterChain) {
+            if (registration.matches(requestURI)) {
+                matchedFilters.add(registration.getFilter());
+            }
+        }
+        
+        return new FilterChainImpl(matchedFilters, servlet);
     }
 
     @Override
@@ -481,6 +551,10 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to instantiate listener", e);
         }
+    }
+
+    public void publishEvent(EventObject event) {
+        internalContext.publishEvent(event);
     }
 
     @Override
@@ -538,56 +612,32 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void addServletMapping(String servletName, String urlPattern) {
-        if (servletMap.containsKey(servletName)) {
+        if (servletRegistrations.containsKey(servletName)) {
             servletUrlPatterns.put(urlPattern, servletName);
         }
-    }
-
-    private void destroyServlet() {
-        for (Map.Entry<String, Servlet> entry : servletMap.entrySet()) {
-            try {
-                Servlet servlet = entry.getValue();
-                servlet.destroy();
-            } catch (Exception e) {
-                logger.error("Error destroying servlet: " + e.getMessage());
-            }
-        }
-        servletMap.clear();
     }
 
     @Override
     public void init() throws Exception {
         initServlet();
+        initFilter();
+    }
+
+    private void initFilter() throws ServletException {
+        for (FilterRegistrationImpl registration : filterChain) {
+            registration.getFilter().init(registration.getFilterConfig());
+        }
     }
 
     private void initServlet() throws ServletException {
         StaticResourceServlet staticServlet = new StaticResourceServlet(this.config);
-        ServletRegistration.Dynamic registration = addServlet("default", staticServlet);
-        registration.addMapping("/");
+        ServletRegistration.Dynamic staticResourceRegistration = addServlet("default", staticServlet);
+        staticResourceRegistration.addMapping("/");
 
-        for (Map.Entry<String, Servlet> entry : servletMap.entrySet()) {
-            Servlet servlet = entry.getValue();
-            servlet.init(new ServletConfig() {
-                @Override
-                public String getServletName() {
-                    return entry.getKey();
-                }
-
-                @Override
-                public ApplicationContext getServletContext() {
-                    return ApplicationContext.this;
-                }
-
-                @Override
-                public String getInitParameter(String name) {
-                    return null;
-                }
-
-                @Override
-                public Enumeration<String> getInitParameterNames() {
-                    return Collections.emptyEnumeration();
-                }
-            });
+        for (Map.Entry<String, ServletRegistrationImpl> entry : servletRegistrations.entrySet()) {
+            ServletRegistrationImpl registration = entry.getValue();
+            Servlet servlet = registration.getServlet();
+            servlet.init(registration.getServletConfig());
         }
     }
 
@@ -604,5 +654,30 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     @Override
     public void destroy() throws Exception {
         destroyServlet();
+        destroyFilter();
+    }
+
+    private void destroyServlet() {
+        for (Map.Entry<String, ServletRegistrationImpl> entry : servletRegistrations.entrySet()) {
+            try {
+                Servlet servlet = entry.getValue().getServlet();
+                servlet.destroy();
+            } catch (Exception e) {
+                logger.error("Error destroying servlet: {}", e.getMessage());
+            }
+        }
+        servletRegistrations.clear();
+    }
+
+    private void destroyFilter() {
+        for (FilterRegistrationImpl registration : filterChain) {
+            try {
+                Filter filter = registration.getFilter();
+                filter.destroy();
+            } catch (Exception e) {
+                logger.error("Error destroying filter: {}", e.getMessage());
+            }
+        }
+        filterChain.clear();
     }
 }

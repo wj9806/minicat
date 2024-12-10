@@ -1,4 +1,4 @@
-package com.minicat.example;
+package com.minicat.example.servlet;
 
 import com.minicat.server.HttpServlet;
 import org.slf4j.Logger;
@@ -20,7 +20,7 @@ public class HelloServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException {
+            throws IOException {
         resp.setContentType("text/html");
         resp.setCharacterEncoding("UTF-8");
         PrintWriter writer = resp.getWriter();

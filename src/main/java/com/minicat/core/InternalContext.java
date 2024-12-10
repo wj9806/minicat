@@ -2,8 +2,11 @@ package com.minicat.core;
 
 import com.minicat.core.event.EventType;
 import com.minicat.core.event.ServletContextAttributeEventObject;
+import com.minicat.core.event.ServletContextEventObject;
+
 import javax.servlet.ServletContextAttributeListener;
 import javax.servlet.ServletRequestAttributeListener;
+import javax.servlet.ServletRequestListener;
 import java.util.ArrayList;
 import java.util.EventListener;
 import java.util.EventObject;
@@ -14,44 +17,54 @@ public class InternalContext {
 
     public <T extends EventListener> void addListener(T t) {
         if (t instanceof ServletRequestAttributeListener || 
-            t instanceof ServletContextAttributeListener) {
+            t instanceof ServletContextAttributeListener ||
+            t instanceof ServletRequestListener) {
             listeners.add(t);
         }
     }
 
     public void publishEvent(EventObject event) {
-        if (listeners.isEmpty() || !(event instanceof ServletContextAttributeEventObject)) {
+        if (listeners.isEmpty()) {
             return;
         }
 
-        ServletContextAttributeEventObject attributeEvent = (ServletContextAttributeEventObject) event;
-        EventType eventType = attributeEvent.getEventType();
+        if (event instanceof ServletContextAttributeEventObject) {
+            ServletContextAttributeEventObject attributeEvent = (ServletContextAttributeEventObject) event;
+            EventType eventType = attributeEvent.getEventType();
 
-        for (EventListener listener : listeners) {
-            if (listener instanceof ServletContextAttributeListener) {
-                ServletContextAttributeListener contextListener = (ServletContextAttributeListener) listener;
-                switch (eventType) {
-                    case ATTRIBUTE_ADDED:
-                        contextListener.attributeAdded(attributeEvent);
-                        break;
-                    case ATTRIBUTE_REMOVED:
-                        contextListener.attributeRemoved(attributeEvent);
-                        break;
-                    case ATTRIBUTE_REPLACED:
-                        contextListener.attributeReplaced(attributeEvent);
-                        break;
+            for (EventListener listener : listeners) {
+                if (listener instanceof ServletContextAttributeListener) {
+                    ServletContextAttributeListener contextListener = (ServletContextAttributeListener) listener;
+                    switch (eventType) {
+                        case ATTRIBUTE_ADDED:
+                            contextListener.attributeAdded(attributeEvent);
+                            break;
+                        case ATTRIBUTE_REMOVED:
+                            contextListener.attributeRemoved(attributeEvent);
+                            break;
+                        case ATTRIBUTE_REPLACED:
+                            contextListener.attributeReplaced(attributeEvent);
+                            break;
+                    }
+                }
+            }
+        } else if (event instanceof ServletContextEventObject) {
+            ServletContextEventObject requestEvent = (ServletContextEventObject) event;
+            EventType eventType = requestEvent.getEventType();
+
+            for (EventListener listener : listeners) {
+                if (listener instanceof ServletRequestListener) {
+                    ServletRequestListener requestListener = (ServletRequestListener) listener;
+                    switch (eventType) {
+                        case REQUEST_DESTROYED:
+                            requestListener.requestDestroyed(requestEvent);
+                            break;
+                        case REQUEST_INITIALIZED:
+                            requestListener.requestInitialized(requestEvent);
+                            break;
+                    }
                 }
             }
         }
-    }
-
-    public List<ServletRequestAttributeListener> getRequestAttributeListeners() {
-        List<ServletRequestAttributeListener> requestListeners = new ArrayList<>();
-        for (EventListener listener : listeners) {
-            if (listener instanceof ServletRequestAttributeListener) {
-                requestListeners.add((ServletRequestAttributeListener) listener);
-            }
-        }
-        return requestListeners;
     }
 }

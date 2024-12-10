@@ -1,7 +1,7 @@
 package com.minicat.http;
 
 import com.minicat.core.ApplicationContext;
-import com.minicat.core.ServletWrapper;
+import com.minicat.core.ServletRegistrationImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +32,8 @@ public class ApplicationRequest implements HttpServletRequest {
     private String servletPath;
 
     //servlet info
-    private ServletWrapper servletWrapper;
-    private ServletContext servletContext;
+    private ServletRegistrationImpl servletRegistration;
+    private final ServletContext servletContext;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
     //remote info
@@ -158,16 +158,12 @@ public class ApplicationRequest implements HttpServletRequest {
         }
     }
 
-    public void setServletWrapper(Servlet servlet) {
-        this.servletWrapper = (ServletWrapper) servlet;
+    public ServletRegistrationImpl getServletRegistration() {
+        return servletRegistration;
     }
 
-    public ServletWrapper getServletWrapper() {
-        return servletWrapper;
-    }
-
-    public void setServletContext(ApplicationContext applicationContext) {
-        this.servletContext = applicationContext;
+    public void setServletRegistration(ServletRegistrationImpl servletRegistration) {
+        this.servletRegistration = servletRegistration;
     }
 
     @Override
@@ -590,5 +586,28 @@ public class ApplicationRequest implements HttpServletRequest {
         this.serverPort = serverPort;
         this.secure = secure;
         this.scheme = secure ? "https" : "http";
+    }
+
+    public void destroy() {
+        // 清理资源
+        try {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (reader != null) {
+                reader.close();
+            }
+        } catch (IOException e) {
+            logger.error("Error closing request resources", e);
+        }
+
+        // 清理属性
+        attributes.clear();
+        parameters.clear();
+        
+        // 清理引用
+        servletRegistration = null;
+        body = null;
+        charset = null;
     }
 }
