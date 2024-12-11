@@ -3,13 +3,13 @@ package com.minicat.server.connector;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.ApplicationContext;
 import com.minicat.server.processor.BioProcessor;
+import com.minicat.server.thread.Worker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * BIO连接器实现
@@ -19,12 +19,12 @@ public class BioConnector implements ServerConnector {
     private final String name = "BioConnector";
     private final ServerConfig config;
     private final ApplicationContext applicationContext;
-    private final ThreadPoolExecutor threadPool;
+    private final Worker worker;
     private volatile boolean running = false;
     private ServerSocket serverSocket;
 
-    public BioConnector(ThreadPoolExecutor threadPool, ApplicationContext applicationContext, ServerConfig config) {
-        this.threadPool = threadPool;
+    public BioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
+        this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
     }
@@ -98,8 +98,8 @@ public class BioConnector implements ServerConnector {
             }
         };
 
-        if (config.isThreadPoolEnabled() && threadPool != null) {
-            threadPool.execute(task);
+        if (config.isWorkerEnabled() && worker != null) {
+            worker.execute(task);
         } else {
             task.run();
         }

@@ -4,7 +4,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletRequestEvent;
 
-public class ServletContextEventObject extends ServletRequestEvent {
+public class ServletRequestEventObject extends ServletRequestEvent {
 
     private final EventType eventType;
 
@@ -13,7 +13,7 @@ public class ServletContextEventObject extends ServletRequestEvent {
      *
      * @param source - the ServletContext that is sending the event.
      */
-    public ServletContextEventObject(ServletContext source, ServletRequest request, EventType eventType) {
+    public ServletRequestEventObject(ServletContext source, ServletRequest request, EventType eventType) {
         super(source, request);
         this.eventType = eventType;
     }

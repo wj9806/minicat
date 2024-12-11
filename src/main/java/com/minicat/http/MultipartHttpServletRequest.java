@@ -1,5 +1,7 @@
 package com.minicat.http;
 
+import com.minicat.server.Lifecycle;
+
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -19,7 +21,7 @@ import java.util.Enumeration;
 /**
  * HttpServletRequest的包装类，用于处理multipart/form-data请求
  */
-public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
+public class MultipartHttpServletRequest extends HttpServletRequestWrapper implements Lifecycle {
 
     // multipart/form-data
     private Map<String, Part> parts;
@@ -278,6 +280,31 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper {
                 String[] newValues = Arrays.copyOf(existingValues, existingValues.length + 1);
                 newValues[existingValues.length] = value;
                 request.parameters.put(name, newValues);
+            }
+        }
+    }
+
+    @Override
+    public void init() throws Exception {
+
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void stop() throws Exception {
+
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        request.destroy();
+        if (parts != null) {
+            for (String key : parts.keySet()) {
+                parts.get(key).delete();
             }
         }
     }

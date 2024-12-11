@@ -1,6 +1,7 @@
 package com.minicat.core;
 
 import com.minicat.http.ApplicationRequest;
+import com.minicat.http.SessionManager;
 import com.minicat.server.*;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.event.EventType;
@@ -29,6 +30,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final Map<String, FilterRegistrationImpl> filterRegistrations = new HashMap<>();
     private final List<FilterRegistrationImpl> filterChain = new ArrayList<>();
 
+    private final SessionManager sessionManager;
     private final ServerConfig config;
     private final String staticPath;
     private final InternalContext internalContext;
@@ -39,6 +41,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
         this.internalContext = new InternalContext();
+        this.sessionManager = new SessionManager();
     }
 
     public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) {
@@ -288,6 +291,10 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         return true;
     }
 
+    public SessionManager getSessionManager() {
+        return sessionManager;
+    }
+
     @Override
     public Object getAttribute(String name) {
         return attributes.get(name);
@@ -313,11 +320,11 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (oldValue == null) {
             // 新增属性
             publishEvent(new ServletContextAttributeEventObject(
-                this, name, object, EventType.ATTRIBUTE_ADDED));
+                this, name, object, EventType.SERVLET_CONTEXT_ATTRIBUTE_ADDED));
         } else if (!object.equals(oldValue)) {
             // 修改属性
             publishEvent(new ServletContextAttributeEventObject(
-                this, name, oldValue, EventType.ATTRIBUTE_REPLACED));
+                this, name, oldValue, EventType.SERVLET_CONTEXT_ATTRIBUTE_REPLACED));
         }
     }
 
@@ -327,7 +334,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (oldValue != null) {
             // 删除属性
             publishEvent(new ServletContextAttributeEventObject(
-                this, name, oldValue, EventType.ATTRIBUTE_REMOVED));
+                this, name, oldValue, EventType.SERVLET_CONTEXT_ATTRIBUTE_REMOVED));
         }
     }
 
@@ -643,18 +650,20 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void start() throws Exception {
-
+        this.sessionManager.start();
     }
 
     @Override
     public void stop() throws Exception {
-
+        this.sessionManager.stop();
     }
 
     @Override
     public void destroy() throws Exception {
         destroyServlet();
         destroyFilter();
+
+        sessionManager.destroy();
     }
 
     private void destroyServlet() {

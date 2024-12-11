@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,6 +54,14 @@ public class JsonServlet extends HttpServlet {
         // 设置响应类型
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
+
+        HttpSession session = req.getSession();
+
+        Object name = session.getAttribute("name");
+        if (name == null)
+            session.setAttribute("name", "JsonServlet");
+
+        
 
         // 读取请求体
         StringBuilder requestBody = new StringBuilder();

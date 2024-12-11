@@ -2,6 +2,9 @@ package com.minicat.http;
 
 import com.minicat.core.ApplicationContext;
 import com.minicat.core.ServletRegistrationImpl;
+import com.minicat.core.event.EventType;
+import com.minicat.core.event.ServletRequestAttributeEventObject;
+import com.minicat.server.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +18,7 @@ import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ApplicationRequest implements HttpServletRequest {
+public class ApplicationRequest implements HttpServletRequest, Lifecycle {
 
     private static final Logger logger = LoggerFactory.getLogger(ApplicationRequest.class);
 
@@ -33,7 +36,7 @@ public class ApplicationRequest implements HttpServletRequest {
 
     //servlet info
     private ServletRegistrationImpl servletRegistration;
-    private final ServletContext servletContext;
+    private final ApplicationContext servletContext;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
     //remote info
@@ -59,6 +62,12 @@ public class ApplicationRequest implements HttpServletRequest {
     private BufferedReader reader;
     byte[] body;
 
+    private HttpServletResponse servletResponse;
+    private HttpSession session;
+    private String requestedSessionId;
+    private boolean requestedSessionIdFromCookie;
+    private boolean requestedSessionIdFromURL;
+
     public ApplicationRequest(ApplicationContext context, String[] lines) {
         String[] requestLine = lines[0].split(" ");
 
@@ -72,7 +81,7 @@ public class ApplicationRequest implements HttpServletRequest {
         this.protocol = protocol;
 
         // Parse URI and query string
-        logger.debug("Received request for URI: {}", requestURI);
+        logger.trace("Received request for URI: {}", requestURI);
         if (requestURI.contains("?")) {
             String[] parts = requestURI.split("\\?", 2);
             this.requestURI = parts[0];
@@ -94,6 +103,10 @@ public class ApplicationRequest implements HttpServletRequest {
                 this.headers.add(entry.getKey(), value);
             }
         }
+    }
+
+    public void setServletResponse(HttpServletResponse servletResponse) {
+        this.servletResponse = servletResponse;
     }
 
     private void parseParameters() {
@@ -270,7 +283,101 @@ public class ApplicationRequest implements HttpServletRequest {
     }
 
     @Override
-    public Cookie[] getCookies() { return new Cookie[0]; }
+    public Cookie[] getCookies() {
+        String cookieHeader = getHeader("Cookie");
+        if (cookieHeader == null) {
+            return null;
+        }
+
+        List<Cookie> cookies = new ArrayList<>();
+        String[] cookiePairs = cookieHeader.split(";");
+        for (String cookiePair : cookiePairs) {
+            String[] nameValue = cookiePair.trim().split("=", 2);
+            if (nameValue.length == 2) {
+                Cookie cookie = new Cookie(nameValue[0], nameValue[1]);
+                cookies.add(cookie);
+                if ("JSESSIONID".equals(nameValue[0])) {
+                    requestedSessionId = nameValue[1];
+                    requestedSessionIdFromCookie = true;
+                }
+            }
+        }
+        return cookies.toArray(new Cookie[0]);
+    }
+
+    @Override
+    public String getRequestedSessionId() {
+        if (requestedSessionId != null) {
+            return requestedSessionId;
+        }
+
+        // 先从cookie中查找
+        Cookie[] cookies = getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("JSESSIONID".equals(cookie.getName())) {
+                    requestedSessionId = cookie.getValue();
+                    requestedSessionIdFromCookie = true;
+                    return requestedSessionId;
+                }
+            }
+        }
+
+        // 再从URL中查找
+        String uri = getRequestURI();
+        String sessionPrefix = ";jsessionid=";
+        int sessionIndex = uri.toLowerCase().indexOf(sessionPrefix);
+        if (sessionIndex != -1) {
+            requestedSessionId = uri.substring(sessionIndex + sessionPrefix.length());
+            requestedSessionIdFromURL = true;
+            return requestedSessionId;
+        }
+
+        return null;
+    }
+
+    @Override
+    public HttpSession getSession(boolean create) {
+        if (session != null && !session.isNew()) {
+            return session;
+        }
+
+        String sessionId = getRequestedSessionId();
+        session = servletContext.getSessionManager().getSession(sessionId, servletContext, create, servletResponse);
+        return session;
+    }
+
+    @Override
+    public HttpSession getSession() {
+        return getSession(true);
+    }
+
+    @Override
+    public boolean isRequestedSessionIdValid() {
+        if (requestedSessionId == null) {
+            return false;
+        }
+        if (session == null) {
+            session = servletContext.getSessionManager()
+                    .getSession(requestedSessionId, servletContext, false, servletResponse);
+        }
+        return session != null;
+    }
+
+    @Override
+    public boolean isRequestedSessionIdFromCookie() {
+        return requestedSessionIdFromCookie;
+    }
+
+    @Override
+    public boolean isRequestedSessionIdFromURL() {
+        return requestedSessionIdFromURL;
+    }
+
+    @Override
+    public boolean isRequestedSessionIdFromUrl() {
+        return isRequestedSessionIdFromURL();
+    }
 
     @Override
     public String getPathInfo() { return pathInfo; }
@@ -293,9 +400,6 @@ public class ApplicationRequest implements HttpServletRequest {
 
     @Override
     public Principal getUserPrincipal() { return null; }
-
-    @Override
-    public String getRequestedSessionId() { return null; }
 
     @Override
     public StringBuffer getRequestURL() {
@@ -321,25 +425,7 @@ public class ApplicationRequest implements HttpServletRequest {
     public String getServletPath() { return servletPath; }
 
     @Override
-    public HttpSession getSession(boolean create) { return null; }
-
-    @Override
-    public HttpSession getSession() { return null; }
-
-    @Override
     public String changeSessionId() { return null; }
-
-    @Override
-    public boolean isRequestedSessionIdValid() { return false; }
-
-    @Override
-    public boolean isRequestedSessionIdFromCookie() { return false; }
-
-    @Override
-    public boolean isRequestedSessionIdFromURL() { return false; }
-
-    @Override
-    public boolean isRequestedSessionIdFromUrl() { return false; }
 
     @Override
     public boolean authenticate(HttpServletResponse response) throws IOException, ServletException {
@@ -381,13 +467,24 @@ public class ApplicationRequest implements HttpServletRequest {
             removeAttribute(name);
             return;
         }
-        
-        attributes.put(name, value);
+
+        Object old = attributes.put(name, value);
+        if (old == null) {
+            servletContext.publishEvent(
+                    new ServletRequestAttributeEventObject(servletContext, this, name, value, EventType.SERVLET_REQUEST_ATTRIBUTE_ADDED));
+        } else {
+            servletContext.publishEvent(
+                    new ServletRequestAttributeEventObject(servletContext, this, name, old, EventType.SERVLET_REQUEST_ATTRIBUTE_REPLACED));
+        }
     }
 
     @Override
     public void removeAttribute(String name) {
-        attributes.remove(name);
+        Object remove = attributes.remove(name);
+        if (remove != null) {
+            servletContext.publishEvent(
+                    new ServletRequestAttributeEventObject(servletContext, this, name, remove, EventType.SERVLET_REQUEST_ATTRIBUTE_REMOVED));
+        }
     }
 
     @Override
@@ -586,6 +683,21 @@ public class ApplicationRequest implements HttpServletRequest {
         this.serverPort = serverPort;
         this.secure = secure;
         this.scheme = secure ? "https" : "http";
+    }
+
+    @Override
+    public void init() throws Exception {
+
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void stop() throws Exception {
+
     }
 
     public void destroy() {

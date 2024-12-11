@@ -67,6 +67,7 @@ public class HttpServer implements Lifecycle {
 
     @Override
     public void start() throws Exception {
+        this.applicationContext.start();
         long totalTime = System.currentTimeMillis() - startTime;
         logger.info("MiniCat server started in {} ms ", totalTime);
 
@@ -76,6 +77,7 @@ public class HttpServer implements Lifecycle {
 
     @Override
     public void stop() throws Exception {
+        this.applicationContext.stop();
         logger.info("Stopping MiniCat server...");
         this.running = false;
         this.connector.stop();
@@ -98,9 +100,9 @@ public class HttpServer implements Lifecycle {
     }
 
     private void createWorker() {
-        if (!config.isThreadPoolEnabled()) return;
+        if (!config.isWorkerEnabled()) return;
 
-        WorkerQueue taskQueue = new WorkerQueue(config.getThreadPoolQueueSize());
+        WorkerQueue taskQueue = new WorkerQueue(config.getWorkerQueueSize());
         AtomicInteger threadNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
             Thread thread = new Thread(r);
@@ -109,9 +111,9 @@ public class HttpServer implements Lifecycle {
         };
 
         worker = new Worker(
-            config.getThreadPoolCoreSize(),
-            config.getThreadPoolMaxSize(),
-            config.getThreadPoolKeepAliveTime(),
+            config.getWorkerCoreSize(),
+            config.getWorkerMaxSize(),
+            config.getWorkerKeepAliveTime(),
             TimeUnit.SECONDS,
             taskQueue,
             threadFactory,
@@ -122,7 +124,7 @@ public class HttpServer implements Lifecycle {
     }
 
     private void initWorker() {
-        if (!config.isThreadPoolEnabled()) return;
+        if (!config.isWorkerEnabled()) return;
 
         // 允许核心线程超时
         worker.allowCoreThreadTimeOut(true);
@@ -134,11 +136,11 @@ public class HttpServer implements Lifecycle {
     private void printStartupInfo() {
         logger.info("MiniCat context path: {}", contextPath.isEmpty() ? "/" : contextPath);
 
-        if (config.isThreadPoolEnabled()) {
+        if (config.isWorkerEnabled()) {
             logger.info("MiniCat worker pool: enabled, core={}, max={}, queueSize={}",
-                    config.getThreadPoolCoreSize(),
-                    config.getThreadPoolMaxSize(),
-                    config.getThreadPoolQueueSize());
+                    config.getWorkerCoreSize(),
+                    config.getWorkerMaxSize(),
+                    config.getWorkerQueueSize());
         } else {
             logger.info("MiniCat worker pool: disabled");
         }

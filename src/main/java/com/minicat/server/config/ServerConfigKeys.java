@@ -11,11 +11,11 @@ public class ServerConfigKeys {
     public static final String SHOW_BANNER = "server.show-banner";
 
     // Thread pool settings
-    public static final String THREAD_POOL_ENABLED = "server.thread-pool.enabled";
-    public static final String THREAD_POOL_CORE_SIZE = "server.thread-pool.core-size";
-    public static final String THREAD_POOL_MAX_SIZE = "server.thread-pool.max-size";
-    public static final String THREAD_POOL_QUEUE_SIZE = "server.thread-pool.queue-size";
-    public static final String THREAD_POOL_KEEP_ALIVE_TIME = "server.thread-pool.keep-alive-time";
+    public static final String WORKER_ENABLED = "server.worker.enabled";
+    public static final String WORKER_CORE_SIZE = "server.worker.core-size";
+    public static final String WORKER_MAX_SIZE = "server.worker.max-size";
+    public static final String WORKER_QUEUE_SIZE = "server.worker.queue-size";
+    public static final String WORKER_KEEP_ALIVE_TIME = "server.worker.keep-alive-time";
     
     // Default values
     public static final String DEFAULT_PORT = "8080";
@@ -24,11 +24,11 @@ public class ServerConfigKeys {
     public static final String DEFAULT_SHOW_BANNER = "true";
     
     // Default thread pool values
-    public static final String DEFAULT_THREAD_POOL_ENABLED = "true";
-    public static final String DEFAULT_THREAD_POOL_CORE_SIZE = "10";
-    public static final String DEFAULT_THREAD_POOL_MAX_SIZE = "50";
-    public static final String DEFAULT_THREAD_POOL_QUEUE_SIZE = "100";
-    public static final String DEFAULT_THREAD_POOL_KEEP_ALIVE_TIME = "60";
+    public static final String DEFAULT_WORKER_ENABLED = "true";
+    public static final String DEFAULT_WORKER_CORE_SIZE = "10";
+    public static final String DEFAULT_WORKER_MAX_SIZE = "50";
+    public static final String DEFAULT_WORKER_QUEUE_SIZE = "100";
+    public static final String DEFAULT_WORKER_KEEP_ALIVE_TIME = "60";
     
     private ServerConfigKeys() {
         // Prevent instantiation

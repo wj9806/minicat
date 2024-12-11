@@ -1,16 +1,17 @@
 package com.minicat.server.processor;
 
 import com.minicat.core.event.EventType;
-import com.minicat.core.event.ServletContextEventObject;
+import com.minicat.core.event.ServletRequestEventObject;
 import com.minicat.http.*;
 import com.minicat.core.ApplicationContext;
+import com.minicat.server.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.FilterChain;
 import javax.servlet.Servlet;
-import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -36,8 +37,9 @@ public class BioProcessor extends Processor {
             OutputStream outputStream = socket.getOutputStream();
 
             // 创建Request和Response对象
+            HttpServletResponse servletResponse = new ApplicationResponse(outputStream);
             try {
-                servletRequest = buildRequest(socket, applicationContext);
+                servletRequest = buildRequest(socket, applicationContext, servletResponse);
             } catch (RequestParseException e) {
                 return;
             }
@@ -47,21 +49,19 @@ public class BioProcessor extends Processor {
                     !servletRequest.getRequestURI().startsWith(applicationContext.getContextPath())) {
 
                 // 发布请求初始化事件
-                applicationContext.publishEvent(new ServletContextEventObject(
-                        applicationContext, servletRequest, EventType.REQUEST_INITIALIZED));
+                applicationContext.publishEvent(new ServletRequestEventObject(
+                        applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
 
                 sendNotFoundResponse(outputStream);
                 return;
             }
 
-            ServletResponse servletResponse = new ApplicationResponse(outputStream);
-
             // 查找匹配的Servlet
             Servlet servlet = applicationContext.findMatchingServlet(servletRequest);
 
             // 发布请求初始化事件
-            applicationContext.publishEvent(new ServletContextEventObject(
-                    applicationContext, servletRequest, EventType.REQUEST_INITIALIZED));
+            applicationContext.publishEvent(new ServletRequestEventObject(
+                    applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
 
             if (servlet != null) {
                 try {
@@ -83,10 +83,12 @@ public class BioProcessor extends Processor {
             try {
                 if (servletRequest != null) {
                     // 调用请求销毁方法
-                    ((ApplicationRequest)servletRequest).destroy();
+                    if (servletRequest instanceof Lifecycle) {
+                        ((Lifecycle)servletRequest).destroy();
+                    }
                     // 发布销毁事件
-                    applicationContext.publishEvent(new ServletContextEventObject(
-                        applicationContext, servletRequest, EventType.REQUEST_DESTROYED));
+                    applicationContext.publishEvent(new ServletRequestEventObject(
+                        applicationContext, servletRequest, EventType.SERVLET_REQUEST_DESTROYED));
                 }
             } catch (Exception e) {
                 logger.error("Error while cleaning up request resources", e);
@@ -94,7 +96,8 @@ public class BioProcessor extends Processor {
         }
     }
 
-    private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext) throws IOException {
+    private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext,
+                                            HttpServletResponse servletResponse) throws IOException {
         InputStream inputStream = socket.getInputStream();
         ByteArrayOutputStream headerOutputStream = new ByteArrayOutputStream();
         ByteArrayOutputStream bodyOutputStream = new ByteArrayOutputStream();
@@ -183,7 +186,7 @@ public class BioProcessor extends Processor {
                 return new MultipartHttpServletRequest(servletRequest);
             }
         }
-
+        servletRequest.setServletResponse(servletResponse);
         return servletRequest;
     }
 

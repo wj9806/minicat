@@ -17,11 +17,11 @@ public class ServerConfig {
     private String contextPath;
     private String staticPath;
     private boolean showBanner;
-    private boolean threadPoolEnabled;
-    private int threadPoolCoreSize;
-    private int threadPoolMaxSize;
-    private int threadPoolQueueSize;
-    private long threadPoolKeepAliveTime;
+    private boolean workerEnabled;
+    private int workerCoreSize;
+    private int workerMaxSize;
+    private int workerQueueSize;
+    private long workerKeepAliveTime;
     
     private ServerConfig() {
         loadProperties();
@@ -49,11 +49,11 @@ public class ServerConfig {
             showBanner = Boolean.parseBoolean(properties.getProperty(SHOW_BANNER, DEFAULT_SHOW_BANNER));
 
             // 线程池配置
-            threadPoolEnabled = Boolean.parseBoolean(properties.getProperty(THREAD_POOL_ENABLED, DEFAULT_THREAD_POOL_ENABLED));
-            threadPoolCoreSize = Integer.parseInt(properties.getProperty(THREAD_POOL_CORE_SIZE, DEFAULT_THREAD_POOL_CORE_SIZE));
-            threadPoolMaxSize = Integer.parseInt(properties.getProperty(THREAD_POOL_MAX_SIZE, DEFAULT_THREAD_POOL_MAX_SIZE));
-            threadPoolQueueSize = Integer.parseInt(properties.getProperty(THREAD_POOL_QUEUE_SIZE, DEFAULT_THREAD_POOL_QUEUE_SIZE));
-            threadPoolKeepAliveTime = Long.parseLong(properties.getProperty(THREAD_POOL_KEEP_ALIVE_TIME, DEFAULT_THREAD_POOL_KEEP_ALIVE_TIME));
+            workerEnabled = Boolean.parseBoolean(properties.getProperty(WORKER_ENABLED, DEFAULT_WORKER_ENABLED));
+            workerCoreSize = Integer.parseInt(properties.getProperty(WORKER_CORE_SIZE, DEFAULT_WORKER_CORE_SIZE));
+            workerMaxSize = Integer.parseInt(properties.getProperty(WORKER_MAX_SIZE, DEFAULT_WORKER_MAX_SIZE));
+            workerQueueSize = Integer.parseInt(properties.getProperty(WORKER_QUEUE_SIZE, DEFAULT_WORKER_QUEUE_SIZE));
+            workerKeepAliveTime = Long.parseLong(properties.getProperty(WORKER_KEEP_ALIVE_TIME, DEFAULT_WORKER_KEEP_ALIVE_TIME));
 
             // 确保context-path以/开头，不以/结尾
             if (!contextPath.startsWith("/")) {
@@ -87,23 +87,23 @@ public class ServerConfig {
         return showBanner;
     }
 
-    public boolean isThreadPoolEnabled() {
-        return threadPoolEnabled;
+    public boolean isWorkerEnabled() {
+        return workerEnabled;
     }
 
-    public int getThreadPoolCoreSize() {
-        return threadPoolCoreSize;
+    public int getWorkerCoreSize() {
+        return workerCoreSize;
     }
 
-    public int getThreadPoolMaxSize() {
-        return threadPoolMaxSize;
+    public int getWorkerMaxSize() {
+        return workerMaxSize;
     }
 
-    public int getThreadPoolQueueSize() {
-        return threadPoolQueueSize;
+    public int getWorkerQueueSize() {
+        return workerQueueSize;
     }
 
-    public long getThreadPoolKeepAliveTime() {
-        return threadPoolKeepAliveTime;
+    public long getWorkerKeepAliveTime() {
+        return workerKeepAliveTime;
     }
 }
