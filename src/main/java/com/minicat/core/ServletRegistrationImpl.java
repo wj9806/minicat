@@ -23,14 +23,24 @@ public class ServletRegistrationImpl extends RegistrationBase implements Servlet
         this.servletConfig = servletConfig;
 
         WebServlet webServlet = servlet.getClass().getAnnotation(WebServlet.class);
-        if (webServlet != null)
+        if (webServlet != null) {
             handleWebInitParams(webServlet.initParams());
+            handleMapping(webServlet.urlPatterns(), webServlet.value());
+        }
         servletConfig.setInitParameters(getInitParameters());
 
         MultipartConfig multipartConfig = servlet.getClass().getAnnotation(MultipartConfig.class);
         if (multipartConfig != null) {
             MultipartConfigElement element = new MultipartConfigElement(multipartConfig);
             this.setMultipartConfig(element);
+        }
+    }
+
+    private void handleMapping(String[] urlPatterns, String[] value) {
+        if (value != null && value.length > 0) {
+            addMapping(value);
+        } else if (urlPatterns != null && urlPatterns.length > 0) {
+            addMapping(urlPatterns);
         }
     }
 

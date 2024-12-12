@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 public class FilterRegistrationImpl extends RegistrationBase implements FilterRegistration.Dynamic {
     private final Filter filter;
     private final List<Pattern> urlPatterns;
+    private final List<String> urlPatternMappings;
     private final FilterConfigImpl filterConfig;
 
     public FilterRegistrationImpl(String filterName, Filter filter, FilterConfigImpl filterConfig) {
@@ -17,14 +18,30 @@ public class FilterRegistrationImpl extends RegistrationBase implements FilterRe
         this.filter = filter;
         this.filterConfig = filterConfig;
         this.urlPatterns = new ArrayList<>();
+        this.urlPatternMappings = new ArrayList<>();
 
         WebFilter webFilter = filter.getClass().getAnnotation(WebFilter.class);
-        if (webFilter != null)
+        if (webFilter != null) {
             handleWebInitParams(webFilter.initParams());
+            handleMapping(webFilter.urlPatterns(), webFilter.value());
+        }
         filterConfig.setInitParameters(getInitParameters());
     }
 
+    private void handleMapping(String[] urlPatterns, String[] value) {
+        if (value != null && value.length > 0) {
+            for (String pa : value) {
+                addUrlPattern(pa);
+            }
+        } else if (urlPatterns != null && urlPatterns.length > 0) {
+            for (String pa : urlPatterns) {
+                addUrlPattern(pa);
+            }
+        }
+    }
+
     public void addUrlPattern(String urlPattern) {
+        urlPatternMappings.add(urlPattern);
         // 将URL模式转换为正则表达式
         String regex = urlPattern
             .replace(".", "\\.")
@@ -69,6 +86,6 @@ public class FilterRegistrationImpl extends RegistrationBase implements FilterRe
 
     @Override
     public Collection<String> getUrlPatternMappings() {
-        return null;
+        return urlPatternMappings;
     }
 }

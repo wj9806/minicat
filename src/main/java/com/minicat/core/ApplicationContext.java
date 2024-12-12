@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
+import javax.servlet.annotation.HandlesTypes;
 import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import java.io.InputStream;
@@ -35,6 +36,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final SessionManager sessionManager;
     private final ServerConfig config;
     private final String staticPath;
+    private final Map<ServletContainerInitializer,Set<Class<?>>> initializers = new LinkedHashMap<>();
     private final InternalEventMulticast internalEventMulticast;
     private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
 
@@ -44,6 +46,22 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         this.staticPath = config.getStaticPath();
         this.internalEventMulticast = new InternalEventMulticast();
         this.sessionManager = new DefaultSessionManager();
+        initContainerInitializers();
+    }
+
+    private void initContainerInitializers() {
+        ServiceLoader<ServletContainerInitializer> load = ServiceLoader.load(ServletContainerInitializer.class);
+        for (ServletContainerInitializer initializer : load) {
+            HandlesTypes handlesTypes = initializer.getClass().getAnnotation(HandlesTypes.class);
+            Class<?>[] value = handlesTypes.value();
+
+            initializers.put(initializer, Arrays.stream(value).collect(Collectors.toSet()));
+        }
+    }
+
+    public void addServletContainerInitializer(
+            ServletContainerInitializer sci, Set<Class<?>> classes) {
+        initializers.put(sci, classes);
     }
 
     public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) throws ServletException {
@@ -622,8 +640,15 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     @Override
     public void init() throws Exception {
         publishEvent(new ServletContextEventObject(this, EventType.SERVLET_CONTEXT_INITIALIZED));
+        onStartup();
         initServlet();
         initFilter();
+    }
+
+    private void onStartup() throws ServletException {
+        for (Map.Entry<ServletContainerInitializer, Set<Class<?>>> entry : initializers.entrySet()) {
+            entry.getKey().onStartup(entry.getValue(), this);
+        }
     }
 
     private void initFilter() throws ServletException {
