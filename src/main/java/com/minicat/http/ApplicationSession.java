@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ApplicationSession implements HttpSession {
 
-    private final String id;
+    private String id;
     private final long creationTime;
     private long lastAccessedTime;
     private int maxInactiveInterval;
@@ -24,8 +24,12 @@ public class ApplicationSession implements HttpSession {
     private final ApplicationContext servletContext;
     private final Map<String, Object> attributes;
 
+    public static String createId() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
     public ApplicationSession(ApplicationContext servletContext) {
-        this.id = UUID.randomUUID().toString().replace("-", "");
+        this.id = createId();
         this.creationTime = System.currentTimeMillis();
         this.lastAccessedTime = this.creationTime;
         this.maxInactiveInterval = 1800;  // 默认30分钟
@@ -36,6 +40,10 @@ public class ApplicationSession implements HttpSession {
 
         // 触发session创建事件
         servletContext.publishEvent(new HttpSessionEventObject(this, EventType.SESSION_CREATED));
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     @Override
@@ -141,7 +149,7 @@ public class ApplicationSession implements HttpSession {
 
         if (value instanceof HttpSessionBindingListener) {
             HttpSessionBindingListener listener = (HttpSessionBindingListener) value;
-            listener.valueBound(new HttpSessionBindingEventObject(this, name, value, EventType.SESSION_VALUE_UNBOUND));
+            listener.valueBound(new HttpSessionBindingEventObject(this, name, value, EventType.SESSION_VALUE_BOUND));
         }
     }
 

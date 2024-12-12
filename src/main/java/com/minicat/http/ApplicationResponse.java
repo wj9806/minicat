@@ -20,6 +20,7 @@ public class ApplicationResponse implements HttpServletResponse {
     private ServletOutputStream servletOutputStream;
 
     private Charset charset = StandardCharsets.ISO_8859_1;
+    private Locale locale = Locale.getDefault();
     private String contentType = "text/html";
     private int status = SC_OK;
     private final HttpHeaders headers = new HttpHeaders();
@@ -277,17 +278,51 @@ public class ApplicationResponse implements HttpServletResponse {
         this.servletOutputStream = null;
     }
 
-    // 以下方法暂不需要实现
     @Override
-    public void setLocale(Locale loc) { }
-
-    @Override
-    public Locale getLocale() {
-        return Locale.getDefault();
+    public void addCookie(Cookie cookie) {
+        if (cookie == null) {
+            return;
+        }
+        StringBuilder cookieStr = new StringBuilder();
+        cookieStr.append(cookie.getName()).append("=").append(cookie.getValue());
+        
+        if (cookie.getMaxAge() >= 0) {
+            cookieStr.append("; Max-Age=").append(cookie.getMaxAge());
+        }
+        if (cookie.getPath() != null) {
+            cookieStr.append("; Path=").append(cookie.getPath());
+        }
+        if (cookie.getDomain() != null) {
+            cookieStr.append("; Domain=").append(cookie.getDomain());
+        }
+        if (cookie.getSecure()) {
+            cookieStr.append("; Secure");
+        }
+        if (cookie.isHttpOnly()) {
+            cookieStr.append("; HttpOnly");
+        }
+        
+        addHeader("Set-Cookie", cookieStr.toString());
     }
 
     @Override
-    public void addCookie(Cookie cookie) { }
+    public void setLocale(Locale loc) {
+        if (loc == null) {
+            return;
+        }
+        this.locale = loc;
+        String language = loc.getLanguage();
+        if (!language.isEmpty()) {
+            String country = loc.getCountry();
+            String value = language + (country.isEmpty() ? "" : "-" + country);
+            setHeader("Content-Language", value);
+        }
+    }
+
+    @Override
+    public Locale getLocale() {
+        return this.locale;
+    }
 
     @Override
     public String encodeURL(String url) { return url; }

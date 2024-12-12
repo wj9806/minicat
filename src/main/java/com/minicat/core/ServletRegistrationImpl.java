@@ -9,9 +9,9 @@ public class ServletRegistrationImpl extends RegistrationBase implements Servlet
     private final Servlet servlet;
     private final ApplicationContext applicationContext;
     private final Set<String> mappings = new HashSet<>();
+    private boolean loaded;
     private int loadOnStartup = -1;
     private String runAsRole;
-    private boolean asyncSupported = false;
     private MultipartConfigElement multipartConfig;
     private final ServletConfigImpl servletConfig;
 
@@ -32,6 +32,14 @@ public class ServletRegistrationImpl extends RegistrationBase implements Servlet
             MultipartConfigElement element = new MultipartConfigElement(multipartConfig);
             this.setMultipartConfig(element);
         }
+    }
+
+    public boolean isLoaded() {
+        return loaded;
+    }
+
+    public void setLoaded(boolean loaded) {
+        this.loaded = loaded;
     }
 
     public Servlet getServlet() {
@@ -134,15 +142,6 @@ public class ServletRegistrationImpl extends RegistrationBase implements Servlet
     @Override
     public void setRunAsRole(String roleName) {
         this.runAsRole = roleName;
-    }
-
-    @Override
-    public void setAsyncSupported(boolean isAsyncSupported) {
-        this.asyncSupported = isAsyncSupported;
-    }
-
-    public boolean isAsyncSupported() {
-        return asyncSupported;
     }
 
     public int getLoadOnStartup() {

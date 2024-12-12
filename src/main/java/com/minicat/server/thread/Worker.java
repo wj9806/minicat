@@ -1,6 +1,6 @@
 package com.minicat.server.thread;
 
-import com.minicat.server.Lifecycle;
+import com.minicat.core.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

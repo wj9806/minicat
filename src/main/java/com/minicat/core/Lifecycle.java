@@ -1,4 +1,4 @@
-package com.minicat.server;
+package com.minicat.core;
 
 /**
  * 服务器组件生命周期接口

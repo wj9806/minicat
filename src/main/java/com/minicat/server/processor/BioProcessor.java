@@ -4,7 +4,7 @@ import com.minicat.core.event.EventType;
 import com.minicat.core.event.ServletRequestEventObject;
 import com.minicat.http.*;
 import com.minicat.core.ApplicationContext;
-import com.minicat.server.Lifecycle;
+import com.minicat.core.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

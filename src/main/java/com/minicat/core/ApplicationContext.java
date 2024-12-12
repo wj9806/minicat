@@ -1,6 +1,8 @@
 package com.minicat.core;
 
+import com.minicat.core.event.ServletContextEventObject;
 import com.minicat.http.ApplicationRequest;
+import com.minicat.http.DefaultSessionManager;
 import com.minicat.http.SessionManager;
 import com.minicat.server.*;
 import com.minicat.server.config.ServerConfig;
@@ -33,18 +35,18 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final SessionManager sessionManager;
     private final ServerConfig config;
     private final String staticPath;
-    private final InternalContext internalContext;
+    private final InternalEventMulticast internalEventMulticast;
     private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
 
     public ApplicationContext(ServerConfig config) {
         this.config = config;
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
-        this.internalContext = new InternalContext();
-        this.sessionManager = new SessionManager();
+        this.internalEventMulticast = new InternalEventMulticast();
+        this.sessionManager = new DefaultSessionManager();
     }
 
-    public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) {
+    public Servlet findMatchingServlet(javax.servlet.http.HttpServletRequest request) throws ServletException {
         ApplicationRequest servletRequest;
         if (request instanceof HttpServletRequestWrapper) {
             servletRequest = (ApplicationRequest)((HttpServletRequestWrapper)request).getRequest();
@@ -70,10 +72,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             servletRequest.setServletPath(path);
             servletRequest.setPathInfo(null);
 
-            ServletRegistrationImpl registration = servletRegistrations.get(servletName);
-            Servlet servlet = registration.getServlet();
-            servletRequest.setServletRegistration(registration);
-            return servlet;
+            return prepareServletForReq(servletName, servletRequest);
         }
 
         // 2. 最长路径前缀匹配 (/xxx/*)
@@ -87,10 +86,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             } else {
                 servletRequest.setPathInfo(null);
             }
-            ServletRegistrationImpl registration = servletRegistrations.get(matchedEntry.getValue());
-            Servlet servlet = registration.getServlet();
-            servletRequest.setServletRegistration(registration);
-            return servlet;
+            return prepareServletForReq(matchedEntry.getValue(), servletRequest);
         }
 
         // 3. 扩展名匹配 (*.xxx)
@@ -101,10 +97,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             if (servletName != null) {
                 servletRequest.setServletPath(path);
                 servletRequest.setPathInfo(null);
-                ServletRegistrationImpl registration = servletRegistrations.get(servletName);
-                Servlet servlet = registration.getServlet();
-                servletRequest.setServletRegistration(registration);
-                return servlet;
+                return prepareServletForReq(servletName, servletRequest);
             }
         }
 
@@ -113,18 +106,20 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         if (servletName != null) {
             servletRequest.setServletPath("");
             servletRequest.setPathInfo(path);
-            ServletRegistrationImpl registration = servletRegistrations.get(servletName);
-            Servlet servlet = registration.getServlet();
-            servletRequest.setServletRegistration(registration);
-            return servlet;
+            return prepareServletForReq(servletName, servletRequest);
         }
 
         // 5. 未匹配
         servletRequest.setServletPath("");
         servletRequest.setPathInfo(null);
-        ServletRegistrationImpl registration = servletRegistrations.get("default");
+        return prepareServletForReq("default", servletRequest);
+    }
+
+    private Servlet prepareServletForReq(String servletName, ApplicationRequest servletRequest) throws ServletException {
+        ServletRegistrationImpl registration = servletRegistrations.get(servletName);
         Servlet servlet = registration.getServlet();
         servletRequest.setServletRegistration(registration);
+        initServlet(registration);
         return servlet;
     }
 
@@ -561,12 +556,12 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     }
 
     public void publishEvent(EventObject event) {
-        internalContext.publishEvent(event);
+        internalEventMulticast.publishEvent(event);
     }
 
     @Override
     public <T extends EventListener> void addListener(T t) {
-        internalContext.addListener(t);
+        internalEventMulticast.addListener(t);
     }
 
     @Override
@@ -626,6 +621,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void init() throws Exception {
+        publishEvent(new ServletContextEventObject(this, EventType.SERVLET_CONTEXT_INITIALIZED));
         initServlet();
         initFilter();
     }
@@ -640,11 +636,23 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         StaticResourceServlet staticServlet = new StaticResourceServlet(this.config);
         ServletRegistration.Dynamic staticResourceRegistration = addServlet("default", staticServlet);
         staticResourceRegistration.addMapping("/");
+        staticResourceRegistration.setLoadOnStartup(0);
 
-        for (Map.Entry<String, ServletRegistrationImpl> entry : servletRegistrations.entrySet()) {
-            ServletRegistrationImpl registration = entry.getValue();
+        List<ServletRegistrationImpl> registrations = servletRegistrations.values().stream()
+                .filter(r -> r.getLoadOnStartup() >= 0)
+                .sorted(Comparator.comparing(ServletRegistrationImpl::getLoadOnStartup))
+                .collect(Collectors.toList());
+
+        for (ServletRegistrationImpl registration : registrations) {
+            initServlet(registration);
+        }
+    }
+
+    private void initServlet(ServletRegistrationImpl registration) throws ServletException {
+        if (!registration.isLoaded()) {
             Servlet servlet = registration.getServlet();
             servlet.init(registration.getServletConfig());
+            registration.setLoaded(true);
         }
     }
 
@@ -662,8 +670,8 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     public void destroy() throws Exception {
         destroyServlet();
         destroyFilter();
-
         sessionManager.destroy();
+        publishEvent(new ServletContextEventObject(this, EventType.SERVLET_CONTEXT_DESTROYED));
     }
 
     private void destroyServlet() {

@@ -48,7 +48,12 @@ public class StaticResourceServlet extends HttpServlet {
         CONTENT_TYPES.put(".flv", "video/x-flv");
         CONTENT_TYPES.put(".mkv", "video/x-matroska");
     }
-    
+
+    @Override
+    public void init() throws ServletException {
+        logger.info("StaticResourceServlet init..");
+    }
+
     public StaticResourceServlet(ServerConfig config) {
         this.config = config;
     }

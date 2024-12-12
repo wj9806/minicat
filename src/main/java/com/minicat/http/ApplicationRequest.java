@@ -3,8 +3,9 @@ package com.minicat.http;
 import com.minicat.core.ApplicationContext;
 import com.minicat.core.ServletRegistrationImpl;
 import com.minicat.core.event.EventType;
+import com.minicat.core.event.HttpSessionIdEventObject;
 import com.minicat.core.event.ServletRequestAttributeEventObject;
-import com.minicat.server.Lifecycle;
+import com.minicat.core.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,7 +426,22 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
     public String getServletPath() { return servletPath; }
 
     @Override
-    public String changeSessionId() { return null; }
+    public String changeSessionId() {
+        HttpSession session = getSession(false);
+        if (session == null) {
+            throw new IllegalStateException("No session exists");
+        }
+
+        SessionManager sessionManager = servletContext.getSessionManager();
+        String oldId = session.getId();
+        String newSessionId = sessionManager.changeSessionId(oldId);
+        
+        // 更新requestedSessionId
+        this.requestedSessionId = newSessionId;
+
+        servletContext.publishEvent(new HttpSessionIdEventObject(session, oldId, newSessionId, EventType.SESSION_ID_CHANGED));
+        return newSessionId;
+    }
 
     @Override
     public boolean authenticate(HttpServletResponse response) throws IOException, ServletException {

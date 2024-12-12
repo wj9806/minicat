@@ -1,6 +1,7 @@
 package com.minicat.server;
 
 import com.minicat.core.ApplicationContext;
+import com.minicat.core.Lifecycle;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.server.connector.BioConnector;
 import com.minicat.server.connector.ServerConnector;
@@ -191,5 +192,9 @@ public class HttpServer implements Lifecycle {
 
         // 添加映射
         registration.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, urls);
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 }

@@ -1,6 +1,6 @@
 package com.minicat.http;
 
-import com.minicat.server.Lifecycle;
+import com.minicat.core.Lifecycle;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;

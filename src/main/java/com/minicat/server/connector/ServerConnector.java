@@ -1,6 +1,6 @@
 package com.minicat.server.connector;
 
-import com.minicat.server.Lifecycle;
+import com.minicat.core.Lifecycle;
 
 /**
  * 服务器连接器接口，定义了连接器的基本行为
