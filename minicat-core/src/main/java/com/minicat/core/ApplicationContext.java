@@ -53,6 +53,10 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         ServiceLoader<ServletContainerInitializer> load = ServiceLoader.load(ServletContainerInitializer.class);
         for (ServletContainerInitializer initializer : load) {
             HandlesTypes handlesTypes = initializer.getClass().getAnnotation(HandlesTypes.class);
+            if (handlesTypes == null) {
+                initializers.put(initializer, new HashSet<>());
+                continue;
+            }
             Class<?>[] value = handlesTypes.value();
 
             initializers.put(initializer, Arrays.stream(value).collect(Collectors.toSet()));
@@ -632,9 +636,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void addServletMapping(String servletName, String urlPattern) {
-        if (servletRegistrations.containsKey(servletName)) {
-            servletUrlPatterns.put(urlPattern, servletName);
-        }
+        servletUrlPatterns.put(urlPattern, servletName);
     }
 
     @Override

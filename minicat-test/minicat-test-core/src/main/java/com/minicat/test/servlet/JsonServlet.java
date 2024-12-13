@@ -1,7 +1,7 @@
-package com.minicat.example.servlet;
+package com.minicat.test.servlet;
 
-import com.minicat.example.JSON;
 import com.minicat.server.HttpServlet;
+import com.minicat.test.util.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.servlet.ServletException;

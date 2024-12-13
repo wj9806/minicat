@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to MiniCat</title>
+    <style>
+        .json-result {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+        .image-container {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .image-container img {
+            max-width: 300px;
+            height: auto;
+        }
+        .form-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            width: 200px;
+        }
+        button {
+            padding: 5px 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background: #f5f5f5;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #e5e5e5;
+        }
+    </style>
+</head>
+<body>
+<h1>Welcome to MiniCat!</h1>
+<p>This is a simple implementation of a web server.</p>
+<p>Try accessing the <a href="/hello.html?a=1&b=2">Hello Servlet</a></p>
+<p>Try accessing the <a href="/upload.html">Upload Servlet</a></p>
+
+<div class="image-container">
+    <h2>Test Image</h2>
+    <img src="/me.jpg" alt="Me" />
+</div>
+
+<div>
+    <h2>Test JSON API</h2>
+    <button onclick="fetchJson()">Fetch JSON Data</button>
+    <button onclick="fetchJson2()">Send POST Request</button>
+    <div id="result" class="json-result"></div>
+</div>
+
+<div class="form-container">
+    <h2>Test Form Submit</h2>
+    <div class="form-group">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" placeholder="Enter username">
+    </div>
+    <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" placeholder="Enter email">
+    </div>
+    <button onclick="submitForm()">Submit Form</button>
+    <div id="formResult" class="json-result"></div>
+</div>
+
+<script>
+    function fetchJson() {
+        fetch('/json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerText = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').innerText = 'Error: ' + error.message;
+            });
+    }
+
+    function fetchJson2() {
+        fetch('/json/abc', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: "123"
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('result').innerText = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+            document.getElementById('result').innerText = 'Error: ' + error.message;
+        });
+    }
+
+    function submitForm() {
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('email', email);
+
+        fetch('/form', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData.toString()
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('formResult').innerText = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+            document.getElementById('formResult').innerText = 'Error: ' + error.message;
+        });
+    }
+</script>
+</body>
+</html>

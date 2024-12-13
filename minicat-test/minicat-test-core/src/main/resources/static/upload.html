@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="file"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<h2>File Upload Test</h2>
+<form id="uploadForm">
+    <div class="form-group">
+        <label for="file">Select File:</label>
+        <input type="file" id="file" name="file" required>
+    </div>
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <input type="text" id="description" name="description" placeholder="Enter file description">
+    </div>
+    <button type="submit">Upload</button>
+</form>
+<div id="result"></div>
+
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var formData = new FormData();
+        var fileInput = document.getElementById('file');
+        var descInput = document.getElementById('description');
+
+        // 获取文件对象
+        var file = fileInput.files[0];
+
+        // 使用原始文件名
+        formData.append('file', file, encodeURIComponent(file.name));
+        formData.append('description', descInput.value);
+
+        // 显示上传进度
+        var resultDiv = document.getElementById('result');
+        resultDiv.innerText = 'Uploading...';
+
+        fetch('/file/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 美化JSON输出
+            resultDiv.innerText = JSON.stringify(data, null, 2);
+
+            // 如果上传成功，清空表单
+            if (data.status === 'success') {
+                document.getElementById('uploadForm').reset();
+            }
+        })
+        .catch(error => {
+            resultDiv.innerText = 'Error: ' + error.message;
+        });
+    });
+</script>
+</body>
+</html>

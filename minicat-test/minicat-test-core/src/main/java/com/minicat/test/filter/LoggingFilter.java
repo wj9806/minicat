@@ -1,4 +1,4 @@
-package com.minicat.example.filter;
+package com.minicat.test.filter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

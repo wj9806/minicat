@@ -1,4 +1,4 @@
-package com.minicat.example.servlet;
+package com.minicat.test.servlet;
 
 import com.minicat.server.HttpServlet;
 import org.slf4j.Logger;

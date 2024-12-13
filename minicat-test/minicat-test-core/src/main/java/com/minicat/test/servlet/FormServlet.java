@@ -1,8 +1,8 @@
-package com.minicat.example.servlet;
+package com.minicat.test.servlet;
 
-import com.minicat.example.JSON;
 
-import javax.servlet.ServletException;
+import com.minicat.test.util.JSON;
+
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;

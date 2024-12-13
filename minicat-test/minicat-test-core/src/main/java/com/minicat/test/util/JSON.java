@@ -1,4 +1,4 @@
-package com.minicat.example;
+package com.minicat.test.util;
 
 import java.util.Map;
 
