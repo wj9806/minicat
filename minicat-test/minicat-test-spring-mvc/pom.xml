@@ -8,8 +8,8 @@
         <artifactId>minicat-test</artifactId>
         <version>1.0.0</version>
     </parent>
-    <packaging>jar</packaging>
-    <artifactId>minicat-test-core</artifactId>
+
+    <artifactId>minicat-test-spring-mvc</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -22,9 +22,21 @@
             <groupId>com.minicat</groupId>
             <artifactId>minicat-core</artifactId>
         </dependency>
+
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
     </dependencies>
+
 </project>

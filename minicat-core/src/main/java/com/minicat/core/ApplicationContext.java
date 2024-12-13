@@ -1,9 +1,12 @@
 package com.minicat.core;
 
+import com.minicat.asm.ClassFileInfo;
+import com.minicat.asm.ClassParser;
 import com.minicat.core.event.ServletContextEventObject;
 import com.minicat.http.ApplicationRequest;
 import com.minicat.http.DefaultSessionManager;
 import com.minicat.http.SessionManager;
+import com.minicat.loader.WebappClassLoader;
 import com.minicat.server.*;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.event.EventType;
@@ -15,9 +18,16 @@ import javax.servlet.*;
 import javax.servlet.annotation.HandlesTypes;
 import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -40,7 +50,11 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final InternalEventMulticast internalEventMulticast;
     private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
 
+    private WebappClassLoader classLoader;
+
     public ApplicationContext(ServerConfig config) {
+        this.classLoader = new WebappClassLoader(ClassLoader.getSystemClassLoader());
+        Thread.currentThread().setContextClassLoader(classLoader);
         this.config = config;
         this.contextPath = config.getContextPath();
         this.staticPath = config.getStaticPath();
@@ -264,19 +278,17 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void log(String msg) {
-        System.out.println("[ServletContext] " + msg);
+        logger.info("{}", msg);
     }
 
     @Override
     public void log(Exception exception, String msg) {
-        System.out.println("[ServletContext] " + msg);
-        exception.printStackTrace();
+        logger.error(msg, exception);
     }
 
     @Override
     public void log(String message, Throwable throwable) {
-        System.out.println("[ServletContext] " + message);
-        throwable.printStackTrace();
+        logger.error(message, throwable);
     }
 
     @Override
@@ -641,16 +653,103 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public void init() throws Exception {
-        publishEvent(new ServletContextEventObject(this, EventType.SERVLET_CONTEXT_INITIALIZED));
         onStartup();
+        publishEvent(new ServletContextEventObject(this, EventType.SERVLET_CONTEXT_INITIALIZED));
         initServlet();
         initFilter();
     }
 
     private void onStartup() throws ServletException {
         for (Map.Entry<ServletContainerInitializer, Set<Class<?>>> entry : initializers.entrySet()) {
-            entry.getKey().onStartup(entry.getValue(), this);
+            Set<Class<?>> foundClasses = new HashSet<>();
+            for (Class<?> clazz : entry.getValue()) {
+                foundClasses.addAll(loadClass(clazz));
+            }
+            entry.getKey().onStartup(foundClasses, this);
         }
+    }
+
+    private Set<Class<?>> loadClass(Class<?> clazz) {
+        Set<Class<?>> result = new HashSet<>();
+        result.add(clazz); // 添加当前类本身
+
+        try {
+            // 获取系统类加载器（或者应用程序类加载器）
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+            // 获取类路径（这通常不包括 JAR 文件内的类，需要额外处理）
+
+            URL[] urLs = ((URLClassLoader) classLoader).getURLs();
+            List<File> dirs = new ArrayList<>();
+            for (URL url : urLs) {
+                File dir = new File(url.getFile());
+                if (dir.exists() && dir.isDirectory()) {
+                    dirs.add(dir);
+                }
+            }
+            // 遍历类路径下的所有目录，查找类文件
+            for (File dir : dirs) {
+                findAndAddClasses(dir, clazz.getPackage().getName(), clazz, result);
+            }
+
+            // 注意：这里没有处理 JAR 文件内的类，需要额外的逻辑来解压缩 JAR 并扫描其中的类文件
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    private void findAndAddClasses(File directory, String packageName, Class<?> clazz, Set<Class<?>> result) throws IOException, ClassNotFoundException, NoSuchMethodException {
+        if (!directory.exists()) {
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return;
+        }
+
+        for (File file : files) {
+            if (file.isDirectory()) {
+                findAndAddClasses(file, packageName + "." + file.getName(), clazz, result);
+            } else if (file.getName().endsWith(".class")) {
+
+                ClassFileInfo classFileInfo = ClassParser.parseClass(Files.newInputStream(file.toPath()));
+                String cn = classFileInfo.getClassName();
+                WebappClassLoader classLoader = (WebappClassLoader)Thread.currentThread().getContextClassLoader();
+                if (isCandidate(classFileInfo, clazz)) {
+                    Class<?> loadedClass = classLoader.loadClass(cn, Files.newInputStream(file.toPath()));
+                    if (clazz.isAssignableFrom(loadedClass) && loadedClass != clazz) {
+                        result.add(loadedClass);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isCandidate(ClassFileInfo classFileInfo, Class<?> clazz) {
+        String className = classFileInfo.getClassName();
+        String superClassName = classFileInfo.getSuperClassName();
+        Set<String> interfaceNames = classFileInfo.getInterfaceNames();
+
+        String curName = clazz.getName();
+
+        if (curName.equals(className)) {
+            return true;
+        }
+
+        if (curName.equals(superClassName)) {
+            return true;
+        }
+
+        for (String interfaceName : interfaceNames) {
+            if (curName.equals(interfaceName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void initFilter() throws ServletException {
@@ -662,7 +761,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private void initServlet() throws ServletException {
         StaticResourceServlet staticServlet = new StaticResourceServlet(this.config);
         ServletRegistration.Dynamic staticResourceRegistration = addServlet("default", staticServlet);
-        staticResourceRegistration.addMapping("/");
+        staticResourceRegistration.addMapping("/*");
         staticResourceRegistration.setLoadOnStartup(0);
 
         List<ServletRegistrationImpl> registrations = servletRegistrations.values().stream()
