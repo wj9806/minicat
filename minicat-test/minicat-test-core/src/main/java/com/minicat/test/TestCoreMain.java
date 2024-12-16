@@ -22,6 +22,7 @@ public class TestCoreMain {
 
         server.addFilter(new LoggingFilter(), "/*");
         server.addFilter(new TestFilter(), "/");
+        miniCat.init();
         miniCat.start();
     }
 }

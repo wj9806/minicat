@@ -4,6 +4,7 @@ import com.minicat.asm.ClassFileInfo;
 import com.minicat.asm.ClassParser;
 import com.minicat.core.event.ServletContextEventObject;
 import com.minicat.http.ApplicationRequest;
+import com.minicat.http.ApplicationSessionCookieConfig;
 import com.minicat.http.DefaultSessionManager;
 import com.minicat.http.SessionManager;
 import com.minicat.loader.WebappClassLoader;
@@ -19,11 +20,8 @@ import javax.servlet.annotation.HandlesTypes;
 import javax.servlet.http.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -43,6 +41,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private final Map<String, FilterRegistrationImpl> filterRegistrations = new HashMap<>();
     private final List<FilterRegistrationImpl> filterChain = new ArrayList<>();
 
+    private final SessionCookieConfig sessionCookieConfig;
     private final SessionManager sessionManager;
     private final ServerConfig config;
     private final String staticPath;
@@ -60,6 +59,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         this.staticPath = config.getStaticPath();
         this.internalEventMulticast = new InternalEventMulticast();
         this.sessionManager = new DefaultSessionManager();
+        this.sessionCookieConfig = new ApplicationSessionCookieConfig();
         initContainerInitializers();
     }
 
@@ -553,7 +553,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public SessionCookieConfig getSessionCookieConfig() {
-        return null;
+        return this.sessionCookieConfig;
     }
 
     @Override
@@ -661,11 +661,15 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     private void onStartup() throws ServletException {
         for (Map.Entry<ServletContainerInitializer, Set<Class<?>>> entry : initializers.entrySet()) {
-            Set<Class<?>> foundClasses = new HashSet<>();
-            for (Class<?> clazz : entry.getValue()) {
-                foundClasses.addAll(loadClass(clazz));
+            if (entry.getValue() == null) {
+                entry.getKey().onStartup(null, this);
+            } else {
+                Set<Class<?>> foundClasses = new HashSet<>();
+                for (Class<?> clazz : entry.getValue()) {
+                    foundClasses.addAll(loadClass(clazz));
+                }
+                entry.getKey().onStartup(foundClasses, this);
             }
-            entry.getKey().onStartup(foundClasses, this);
         }
     }
 

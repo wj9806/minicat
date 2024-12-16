@@ -21,7 +21,7 @@ public class BannerPrinter {
     }
 
     public static void printBanner() {
-        try (InputStream inputStream = BannerPrinter.class.getResourceAsStream("/banner.txt")) {
+        try (InputStream inputStream = BannerPrinter.class.getResourceAsStream("/minicat-banner.txt")) {
             if (inputStream != null) {
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {

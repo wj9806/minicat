@@ -55,8 +55,6 @@ public class HttpServer implements Lifecycle {
 
     @Override
     public void init() throws Exception {
-        // 打印启动信息
-        printStartupInfo();
         // 注册关闭钩子
         registerShutdownHook();
         //初始化工作线程
@@ -74,6 +72,8 @@ public class HttpServer implements Lifecycle {
 
         this.running = true;
         this.connector.start();
+        // 打印启动信息
+        printStartupInfo();
     }
 
     @Override
@@ -196,5 +196,13 @@ public class HttpServer implements Lifecycle {
 
     public boolean isRunning() {
         return running;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public ApplicationContext getApplicationContext() {
+        return applicationContext;
     }
 }

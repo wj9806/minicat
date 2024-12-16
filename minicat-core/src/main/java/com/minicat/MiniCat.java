@@ -1,10 +1,11 @@
 package com.minicat;
 
+import com.minicat.core.Lifecycle;
 import com.minicat.server.HttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MiniCat {
+public class MiniCat implements Lifecycle {
     private static final Logger logger = LoggerFactory.getLogger(MiniCat.class);
 
     private final HttpServer server;
@@ -21,12 +22,35 @@ public class MiniCat {
         return server;
     }
 
-    public void start() {
+    public int getPort() {
+        return server.getPort();
+    }
+
+    @Override
+    public void init(){
         try {
             server.init();
+        } catch (Exception e) {
+            logger.error("Server init failed", e);
+        }
+    }
+
+    @Override
+    public void start() {
+        try {
             server.start();
         } catch (Exception e) {
             logger.error("Server startup failed", e);
         }
+    }
+
+    @Override
+    public void stop() throws Exception {
+        server.stop();
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        server.destroy();
     }
 }

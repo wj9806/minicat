@@ -11,6 +11,7 @@
     <modules>
         <module>minicat-core</module>
         <module>minicat-test</module>
+        <module>minicat-spring-boot-starter</module>
     </modules>
 
     <properties>

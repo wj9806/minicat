@@ -22,11 +22,13 @@ public class BioConnector implements ServerConnector {
     private final Worker worker;
     private volatile boolean running = false;
     private ServerSocket serverSocket;
+    private final BioAcceptor acceptor;
 
     public BioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
         this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
+        this.acceptor = new BioAcceptor();
     }
 
     @Override
@@ -43,23 +45,14 @@ public class BioConnector implements ServerConnector {
     @Override
     public void start() throws Exception {
         running = true;
+        acceptor.start();
 
-        try {
-            while (running) {
-                Socket socket = serverSocket.accept();
-                handleSocket(socket);
-            }
-        } catch (IOException e) {
-            if (running) {
-                logger.error("Error accepting connection", e);
-                throw e;
-            }
-        }
     }
 
     @Override
     public void stop() throws Exception {
         running = false;
+        acceptor.interrupt();
         logger.info("{} stopping...", getName());
 
         if (serverSocket != null && !serverSocket.isClosed()) {
@@ -102,6 +95,28 @@ public class BioConnector implements ServerConnector {
             worker.execute(task);
         } else {
             task.run();
+        }
+    }
+
+    class BioAcceptor extends Thread {
+
+        public BioAcceptor() {
+            super("acceptor");
+        }
+
+        @Override
+        public void run() {
+            try {
+                while (running) {
+                    Socket socket = serverSocket.accept();
+                    handleSocket(socket);
+                }
+            } catch (IOException e) {
+                if (running) {
+                    logger.error("Error accepting connection", e);
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
 }

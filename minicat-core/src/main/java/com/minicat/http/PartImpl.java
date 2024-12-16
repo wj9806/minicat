@@ -70,7 +70,7 @@ public class PartImpl implements Part {
 
     @Override
     public String getHeader(String name) {
-        return headers.get(name);
+        return headers.get(name.toLowerCase());
     }
 
     @Override

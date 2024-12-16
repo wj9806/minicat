@@ -8,13 +8,8 @@
         <artifactId>minicat</artifactId>
         <version>1.0.0</version>
     </parent>
-    <packaging>pom</packaging>
-    <modules>
-        <module>minicat-test-core</module>
-        <module>minicat-test-spring-mvc</module>
-        <module>minicat-test-spring-boot</module>
-    </modules>
-    <artifactId>minicat-test</artifactId>
+
+    <artifactId>minicat-spring-boot-starter</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -22,14 +17,16 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>com.minicat</groupId>
-                <artifactId>minicat-core</artifactId>
-                <version>${parent.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
 
+        <dependency>
+            <groupId>com.minicat</groupId>
+            <artifactId>minicat-core</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+    </dependencies>
 </project>

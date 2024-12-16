@@ -35,9 +35,9 @@ public class ServerConfig {
     }
     
     private void loadProperties() {
-        try (InputStream input = getClass().getResourceAsStream("/server.properties")) {
+        try (InputStream input = getClass().getResourceAsStream("/minicat.properties")) {
             if (input == null) {
-                logger.error("Unable to find server.properties");
+                logger.error("Unable to find minicat.properties");
                 return;
             }
             properties.load(input);
@@ -63,8 +63,16 @@ public class ServerConfig {
                 contextPath = contextPath.substring(0, contextPath.length() - 1);
             }
         } catch (IOException e) {
-            logger.error("Error loading server.properties", e);
+            logger.error("Error loading minicat.properties", e);
         }
+    }
+
+    public void setShowBanner(boolean showBanner) {
+        this.showBanner = showBanner;
+    }
+
+    public void setProperties(String key, String value) {
+        properties.setProperty(key, value);
     }
 
     public int getPort() {
