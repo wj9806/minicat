@@ -246,6 +246,10 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
 
     private void addPart(String name, String fileName, Map<String, String> headers, byte[] content) {
         MultipartConfigElement multipartConfig = request.getServletRegistration().getMultipartConfig();
+
+        if (multipartConfig == null)
+            throw new NullPointerException("MultipartConfigElement is null");
+
         // 检查文件大小限制
         if (fileName != null && multipartConfig.getMaxFileSize() > 0 && content.length > multipartConfig.getMaxFileSize()) {
             throw new RequestParseException(String.format(

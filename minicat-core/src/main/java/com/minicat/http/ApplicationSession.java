@@ -24,6 +24,7 @@ public class ApplicationSession implements HttpSession {
     private final ApplicationContext servletContext;
     private final Map<String, Object> attributes;
 
+
     public static String createId() {
         return UUID.randomUUID().toString().replace("-", "");
     }
@@ -36,6 +37,7 @@ public class ApplicationSession implements HttpSession {
         this.isNew = true;
         this.isValid = true;
         this.servletContext = servletContext;
+
         this.attributes = new ConcurrentHashMap<>();
 
         // 触发session创建事件

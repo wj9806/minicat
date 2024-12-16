@@ -54,14 +54,12 @@ public class JsonServlet extends HttpServlet {
         // 设置响应类型
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
-
         HttpSession session = req.getSession();
 
         Object name = session.getAttribute("name");
         if (name == null)
             session.setAttribute("name", "JsonServlet");
 
-        
 
         // 读取请求体
         StringBuilder requestBody = new StringBuilder();

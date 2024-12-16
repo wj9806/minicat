@@ -67,9 +67,6 @@ public class HttpServer implements Lifecycle {
     @Override
     public void start() throws Exception {
         this.applicationContext.start();
-        long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("MiniCat server started in {} ms ", totalTime);
-
         this.running = true;
         this.connector.start();
         // 打印启动信息
@@ -107,7 +104,7 @@ public class HttpServer implements Lifecycle {
         AtomicInteger threadNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
             Thread thread = new Thread(r);
-            thread.setName("minicat-worker-" + threadNumber.getAndIncrement());
+            thread.setName("MiniCat-Worker-" + threadNumber.getAndIncrement());
             return thread;
         };
 
@@ -128,10 +125,7 @@ public class HttpServer implements Lifecycle {
         if (!config.isWorkerEnabled()) return;
 
         // 允许核心线程超时
-        worker.allowCoreThreadTimeOut(true);
-
-        // 预启动所有核心线程
-        worker.prestartAllCoreThreads();
+        //worker.allowCoreThreadTimeOut(true);
     }
 
     private void printStartupInfo() {
@@ -146,6 +140,9 @@ public class HttpServer implements Lifecycle {
             logger.info("MiniCat worker pool: disabled");
         }
         logger.info("MiniCat start on port: {}", port);
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        logger.info("MiniCat server started in {} ms ", totalTime);
     }
     
     private void registerShutdownHook() {

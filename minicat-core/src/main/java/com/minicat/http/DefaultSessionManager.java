@@ -4,6 +4,7 @@ import com.minicat.core.ApplicationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.SessionCookieConfig;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
@@ -54,11 +55,24 @@ public class DefaultSessionManager implements SessionManager {
         ApplicationSession session = new ApplicationSession(servletContext);
         sessions.put(session.getId(), session);
 
-        Cookie cookie = new Cookie("JSESSIONID", session.getId());
-        cookie.setPath("/");
-        cookie.setHttpOnly(true);
+        Cookie cookie = createCookie(servletContext, session);
         servletResponse.addCookie(cookie);
         return session;
+    }
+
+    private static Cookie createCookie(ApplicationContext servletContext, ApplicationSession session) {
+        SessionCookieConfig sessionCookieConfig = servletContext.getSessionCookieConfig();
+
+        Cookie cookie = new Cookie(sessionCookieConfig.getName(), session.getId());
+        cookie.setPath(sessionCookieConfig.getPath());
+        cookie.setHttpOnly(sessionCookieConfig.isHttpOnly());
+        cookie.setMaxAge(sessionCookieConfig.getMaxAge());
+        if (sessionCookieConfig.getDomain() != null) {
+            cookie.setDomain(sessionCookieConfig.getDomain());
+        }
+        cookie.setSecure(sessionCookieConfig.isSecure());
+        cookie.setComment(sessionCookieConfig.getComment());
+        return cookie;
     }
 
     private boolean isExpired(ApplicationSession session) {

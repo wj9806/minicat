@@ -101,7 +101,7 @@ public class BioConnector implements ServerConnector {
     class BioAcceptor extends Thread {
 
         public BioAcceptor() {
-            super("acceptor");
+            super("Acceptor");
         }
 
         @Override

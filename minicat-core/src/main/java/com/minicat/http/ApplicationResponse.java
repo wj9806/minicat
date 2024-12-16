@@ -116,6 +116,7 @@ public class ApplicationResponse implements HttpServletResponse {
             case SC_NOT_FOUND: return "Not Found";
             case SC_INTERNAL_SERVER_ERROR: return "Internal Server Error";
             case SC_FOUND: return "Found";
+            case SC_NOT_MODIFIED: return "Not Modified";
             default: return "Unknown";
         }
     }

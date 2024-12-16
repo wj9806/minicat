@@ -737,5 +737,6 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
         servletRegistration = null;
         body = null;
         charset = null;
+        servletResponse = null;
     }
 }
