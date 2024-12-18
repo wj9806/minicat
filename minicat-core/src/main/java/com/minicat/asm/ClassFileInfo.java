@@ -1,7 +1,5 @@
 package com.minicat.asm;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.util.Set;
 
 public class ClassFileInfo {

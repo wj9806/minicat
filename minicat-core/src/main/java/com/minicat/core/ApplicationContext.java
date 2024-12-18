@@ -666,14 +666,14 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             } else {
                 Set<Class<?>> foundClasses = new HashSet<>();
                 for (Class<?> clazz : entry.getValue()) {
-                    foundClasses.addAll(loadClass(clazz));
+                    foundClasses.addAll(scanClass(clazz));
                 }
                 entry.getKey().onStartup(foundClasses, this);
             }
         }
     }
 
-    private Set<Class<?>> loadClass(Class<?> clazz) {
+    private Set<Class<?>> scanClass(Class<?> clazz) {
         Set<Class<?>> result = new HashSet<>();
         result.add(clazz); // 添加当前类本身
 
@@ -699,7 +699,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
             // 注意：这里没有处理 JAR 文件内的类，需要额外的逻辑来解压缩 JAR 并扫描其中的类文件
 
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
 
         return result;
