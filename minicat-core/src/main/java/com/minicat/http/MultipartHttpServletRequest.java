@@ -179,7 +179,6 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                                 }
                                 rnum = 0;
                                 currentPartData.write('\n');
-                                System.out.println("写入~~" + currentPartData.size());
                             } else {
                                 state = 1; // 找到新的boundary，切换到读取headers状态
                                 // 保存当前part
