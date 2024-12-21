@@ -24,20 +24,26 @@ public class BioProcessor extends Processor {
     private static final Logger logger = LoggerFactory.getLogger(BioProcessor.class);
     private final ApplicationContext applicationContext;
     private final Socket socket;
+    private final OutputStream hos;
+    private final InputStream his;
 
     public BioProcessor(ApplicationContext applicationContext, Socket socket) {
         this.applicationContext = applicationContext;
         this.socket = socket;
+        try {
+            this.hos = socket.getOutputStream();
+            this.his = socket.getInputStream();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public void process() throws Exception {
         HttpServletRequest servletRequest = null;
         try {
-            OutputStream outputStream = socket.getOutputStream();
-
             // 创建Request和Response对象
-            HttpServletResponse servletResponse = new ApplicationResponse(outputStream);
+            HttpServletResponse servletResponse = new ApplicationResponse(hos);
             try {
                 servletRequest = buildRequest(socket, applicationContext, servletResponse);
             } catch (RequestParseException e) {
@@ -52,7 +58,7 @@ public class BioProcessor extends Processor {
                 applicationContext.publishEvent(new ServletRequestEventObject(
                         applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
 
-                sendNotFoundResponse(outputStream);
+                sendNotFoundResponse(hos);
                 return;
             }
 
@@ -74,7 +80,7 @@ public class BioProcessor extends Processor {
                     }
                 } catch (Exception e) {
                     logger.error("Error processing request", e);
-                    sendErrorResponse(outputStream, e.getMessage());
+                    sendErrorResponse(hos, e.getMessage());
                 }
             }
         } catch (IOException e) {
@@ -98,7 +104,6 @@ public class BioProcessor extends Processor {
 
     private HttpServletRequest buildRequest(Socket socket, ApplicationContext applicationContext,
                                             HttpServletResponse servletResponse) throws IOException {
-        InputStream inputStream = socket.getInputStream();
         ByteArrayOutputStream headerOutputStream = new ByteArrayOutputStream();
         ByteArrayOutputStream bodyOutputStream = new ByteArrayOutputStream();
 
@@ -112,7 +117,7 @@ public class BioProcessor extends Processor {
         int totalBodyRead = 0;
 
         // 读取并解析请求
-        while ((len = inputStream.read(buffer)) != -1) {
+        while ((len = his.read(buffer)) != -1) {
             if (!headersComplete) {
                 // 还在处理请求头
                 headerOutputStream.write(buffer, 0, len);

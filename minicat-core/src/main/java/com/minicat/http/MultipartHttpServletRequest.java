@@ -105,10 +105,13 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
 
         int b;
         boolean inLineEnding = false;
+        int rnum = 0;
         try {
             while ((b = bis.read()) != -1) {
                 if (b == '\r') {
                     inLineEnding = true;
+                    if (state == 2)
+                        rnum++;
                     continue;
                 }
 
@@ -148,6 +151,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                         case 1: // 读取headers
                             if (line.isEmpty()) {
                                 state = 2; // headers结束，切换到读取内容状态
+                                rnum = 0;
                             } else {
                                 // 解析header
                                 parsePartHeader(line, currentPartHeaders);
@@ -170,8 +174,12 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                             // 检查是否是boundary
                             if (!line.startsWith(boundary)) {
                                 currentPartData.write(lineBytes);
-                                currentPartData.write('\r');
+                                for (int i = 0; i < rnum; i++) {
+                                    currentPartData.write('\r');
+                                }
+                                rnum = 0;
                                 currentPartData.write('\n');
+                                System.out.println("写入~~" + currentPartData.size());
                             } else {
                                 state = 1; // 找到新的boundary，切换到读取headers状态
                                 // 保存当前part
@@ -197,7 +205,14 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                 }
 
                 if (inLineEnding) {
-                    lineBuffer.write('\r');
+                    if (state == 2) {
+                        for (int i = 0; i < rnum; i++) {
+                            lineBuffer.write('\r');
+                        }
+                        rnum = 0;
+                    } else {
+                        lineBuffer.write('\r');
+                    }
                     inLineEnding = false;
                 }
                 lineBuffer.write(b);
