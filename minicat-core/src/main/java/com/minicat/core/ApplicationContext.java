@@ -807,10 +807,13 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     private void destroyServlet() {
         for (Map.Entry<String, ServletRegistrationImpl> entry : servletRegistrations.entrySet()) {
             try {
-                Servlet servlet = entry.getValue().getServlet();
-                servlet.destroy();
+                ServletRegistrationImpl registration = entry.getValue();
+                if (registration.isLoaded()) {
+                    Servlet servlet = registration.getServlet();
+                    servlet.destroy();
+                }
             } catch (Exception e) {
-                logger.error("Error destroying servlet: {}", e.getMessage());
+                logger.error("Error destroying servlet: ", e);
             }
         }
         servletRegistrations.clear();

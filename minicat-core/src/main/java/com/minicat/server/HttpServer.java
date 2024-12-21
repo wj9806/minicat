@@ -29,6 +29,8 @@ public class HttpServer implements Lifecycle {
     private Worker worker;
     private final ServerConfig config;
     private volatile boolean running = false;
+    private volatile boolean stopped = false;
+    private volatile boolean destroyed = false;
     private final ApplicationContext applicationContext;
     private final ServerConnector connector;
     private final long startTime;
@@ -74,7 +76,8 @@ public class HttpServer implements Lifecycle {
     }
 
     @Override
-    public void stop() throws Exception {
+    public synchronized void stop() throws Exception {
+        if (stopped) return;
         this.applicationContext.stop();
         logger.info("Stopping MiniCat server...");
         this.running = false;
@@ -84,10 +87,12 @@ public class HttpServer implements Lifecycle {
             worker.stop();
         }
         logger.info("MiniCat Server stopped");
+        stopped = true;
     }
 
     @Override
-    public void destroy() throws Exception {
+    public synchronized void destroy() throws Exception {
+        if (destroyed) return;
         logger.info("Destroying MiniCat server...");
         
         // 销毁所有 Servlet
@@ -95,6 +100,7 @@ public class HttpServer implements Lifecycle {
         this.connector.destroy();
         
         logger.info("MiniCat Server destroyed");
+        destroyed = true;
     }
 
     private void createWorker() {
