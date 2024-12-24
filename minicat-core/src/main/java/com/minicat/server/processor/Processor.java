@@ -9,8 +9,9 @@ public abstract class Processor implements Lifecycle {
     /**
      * 处理请求
      * @throws Exception 处理过程中可能出现的异常
+     * @return 等于0 说明处理正常 等于-1说明处理完成
      */
-    protected abstract void process() throws Exception;
+    protected abstract int process() throws Exception;
 
     String notFoundResponse() {
         return "HTTP/1.1 404 Not Found\r\n" +

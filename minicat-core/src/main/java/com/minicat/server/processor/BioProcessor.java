@@ -14,8 +14,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Objects;
 
 /**
  * BIO模式的请求处理器
@@ -26,6 +28,8 @@ public class BioProcessor extends Processor {
     private final Socket socket;
     private final OutputStream hos;
     private final InputStream his;
+    private long lastProcess;
+    private boolean closed = false;
 
     public BioProcessor(ApplicationContext applicationContext, Socket socket) {
         this.applicationContext = applicationContext;
@@ -36,20 +40,22 @@ public class BioProcessor extends Processor {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        this.lastProcess = System.currentTimeMillis();
     }
 
     @Override
-    public void process() throws Exception {
+    public int process() throws Exception {
         HttpServletRequest servletRequest = null;
         try {
             // 创建Request和Response对象
             HttpServletResponse servletResponse = new ApplicationResponse(hos);
             try {
                 servletRequest = buildRequest(socket, applicationContext, servletResponse);
-            } catch (RequestParseException e) {
-                return;
+            }catch (SocketCloseException | RequestParseException | SocketException e) {
+                return -1;
             }
 
+            this.lastProcess = System.currentTimeMillis();
             // 处理context-path
             if (!applicationContext.getContextPath().isEmpty() &&
                     !servletRequest.getRequestURI().startsWith(applicationContext.getContextPath())) {
@@ -59,32 +65,37 @@ public class BioProcessor extends Processor {
                         applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
 
                 sendNotFoundResponse(hos);
-                return;
-            }
+            } else {
+                // 查找匹配的Servlet
+                Servlet servlet = applicationContext.findMatchingServlet(servletRequest);
 
-            // 查找匹配的Servlet
-            Servlet servlet = applicationContext.findMatchingServlet(servletRequest);
+                // 发布请求初始化事件
+                applicationContext.publishEvent(new ServletRequestEventObject(
+                        applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
 
-            // 发布请求初始化事件
-            applicationContext.publishEvent(new ServletRequestEventObject(
-                    applicationContext, servletRequest, EventType.SERVLET_REQUEST_INITIALIZED));
+                if (servlet != null) {
+                    try {
+                        // 构建并执行过滤器链
+                        FilterChain filterChain = applicationContext.buildFilterChain(servletRequest, servlet);
+                        filterChain.doFilter(servletRequest, servletResponse);
 
-            if (servlet != null) {
-                try {
-                    // 构建并执行过滤器链
-                    FilterChain filterChain = applicationContext.buildFilterChain(servletRequest, servlet);
-                    filterChain.doFilter(servletRequest, servletResponse);
-                    
-                    if (!servletResponse.isCommitted()) {
-                        servletResponse.flushBuffer();
+                        if (!servletResponse.isCommitted()) {
+                            servletResponse.flushBuffer();
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error processing request", e);
+                        sendErrorResponse(hos, e.getMessage());
                     }
-                } catch (Exception e) {
-                    logger.error("Error processing request", e);
-                    sendErrorResponse(hos, e.getMessage());
                 }
             }
+
+            if (keepAlive(servletRequest))
+                return 0;
+            else
+                return -1;
         } catch (IOException e) {
             logger.error("Error processing request", e);
+            return -1;
         } finally {
             try {
                 if (servletRequest != null) {
@@ -176,6 +187,10 @@ public class BioProcessor extends Processor {
             }
         }
 
+        if (len == -1) {
+            throw new SocketCloseException();
+        }
+
         if (servletRequest == null) {
             throw new RequestParseException("Invalid HTTP request: headers not found");
         }
@@ -193,6 +208,11 @@ public class BioProcessor extends Processor {
         }
         servletRequest.setServletResponse(servletResponse);
         return servletRequest;
+    }
+
+    private boolean keepAlive(HttpServletRequest servletRequest) {
+        String connection = servletRequest.getHeader("connection");
+        return Objects.equals(connection, "keep-alive");
     }
 
     private void prepareLocalInfo(Socket socket, ApplicationRequest servletRequest) {
@@ -277,5 +297,19 @@ public class BioProcessor extends Processor {
     private void sendErrorResponse(OutputStream outputStream, String message) throws Exception {
         String errorResponse = errorResponse(message);
         outputStream.write(errorResponse.getBytes());
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        if (closed) return;
+
+        closed = true;
+        his.close();
+        hos.close();
+        socket.close();
+    }
+
+    public long getLastProcess() {
+        return lastProcess;
     }
 }

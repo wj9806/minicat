@@ -10,25 +10,35 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
  * BIO连接器实现
  */
 public class BioConnector implements ServerConnector {
     private static final Logger logger = LoggerFactory.getLogger(BioConnector.class);
-    private final String name = "BioConnector";
     private final ServerConfig config;
     private final ApplicationContext applicationContext;
     private final Worker worker;
     private volatile boolean running = false;
     private ServerSocket serverSocket;
     private final BioAcceptor acceptor;
+    private final List<BioProcessor> processors;
+    private final ScheduledExecutorService executorService;
 
     public BioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
         this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
         this.acceptor = new BioAcceptor();
+        this.processors = new CopyOnWriteArrayList<>();
+        this.executorService = new ScheduledThreadPoolExecutor(1, r -> {
+            Thread t = new Thread(r);
+            t.setName("Monitor");
+            return t;
+        });
     }
 
     @Override
@@ -37,7 +47,7 @@ public class BioConnector implements ServerConnector {
         try {
             serverSocket = new ServerSocket(config.getPort());
         } catch (IOException e) {
-            logger.error("Failed to initialize " + getName(), e);
+            logger.error("Failed to initialize {}", getName(), e);
             throw e;
         }
     }
@@ -46,7 +56,7 @@ public class BioConnector implements ServerConnector {
     public void start() throws Exception {
         running = true;
         acceptor.start();
-
+        executorService.scheduleWithFixedDelay(new Monitor(), 50, 50, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -54,6 +64,7 @@ public class BioConnector implements ServerConnector {
         running = false;
         acceptor.interrupt();
         logger.info("{} stopping...", getName());
+        executorService.shutdown();
 
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
@@ -72,19 +83,26 @@ public class BioConnector implements ServerConnector {
 
     @Override
     public String getName() {
-        return name;
+        return "BioConnector";
     }
 
     private void handleSocket(Socket socket) {
         Runnable task = () -> {
+            BioProcessor processor = null;
             try {
-                BioProcessor processor = new BioProcessor(applicationContext, socket);
-                processor.process();
+                processor = new BioProcessor(applicationContext, socket);
+                processors.add(processor);
+                while (true) {
+                    if (processor.process() == -1)
+                        break;
+                }
+                processors.remove(processor);
             } catch (Exception e) {
                 logger.error("Error processing request", e);
             } finally {
                 try {
-                    socket.close();
+                    if (processor != null)
+                        processor.destroy();
                 } catch (Exception e) {
                     logger.error("Error closing socket", e);
                 }
@@ -115,6 +133,23 @@ public class BioConnector implements ServerConnector {
                 if (running) {
                     logger.error("Error accepting connection", e);
                     throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+
+    class Monitor implements Runnable {
+        @Override
+        public void run() {
+            List<BioProcessor> removed = processors.stream()
+                    .filter(p -> System.currentTimeMillis() - p.getLastProcess() > 35000)
+                    .collect(Collectors.toList());
+            processors.removeAll(removed);
+            for (BioProcessor processor : removed) {
+                try {
+                    processor.destroy();
+                } catch (Exception e) {
+                    logger.error("remove processor failed", e);
                 }
             }
         }
