@@ -1,7 +1,7 @@
 package com.minicat.server;
 
 import com.minicat.net.Sock;
-import com.minicat.server.config.ServerConfig;
+import com.minicat.server.config.Config;
 import com.minicat.server.connector.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +43,7 @@ public class Monitor implements Runnable {
      */
     private boolean timeout(Sock<?> sock) {
         return System.currentTimeMillis() - sock.getLastProcess()
-                > 1000L * ServerConfig.getInstance().getHttpKeepAliveTime();
+                > 1000L * Config.getInstance().getHttp().getKeepAliveTime();
     }
 
 }

@@ -1,19 +1,20 @@
 # Minicat Server Configuration
 server:
   port: 8080
-  context-path: /
-  static-path: /static
-  show-banner: true
-  mode: nio
+  contextPath: /
+  staticPath:
+    - /static
+  showBanner: true
+  mode: bio
   worker:
     enabled: true
-    core-size: 10
-    max-size: 50
-    queue-size: 100
-    keep-alive-time: 60
+    coreSize: 10
+    maxSize: 50
+    queueSize: 100
+    keepAliveTime: 60
   nio:
     backlog: 50
 
 #Http Configuration
 http:
-  keep-alive: 35
+  keepAliveTime: 35

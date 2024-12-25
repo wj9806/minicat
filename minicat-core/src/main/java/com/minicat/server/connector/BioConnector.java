@@ -1,7 +1,7 @@
 package com.minicat.server.connector;
 
 import com.minicat.net.Sock;
-import com.minicat.server.config.ServerConfig;
+import com.minicat.server.config.Config;
 import com.minicat.core.ApplicationContext;
 import com.minicat.server.processor.BioProcessor;
 import com.minicat.server.thread.Worker;
@@ -19,7 +19,7 @@ import java.util.concurrent.*;
  */
 public class BioConnector implements ServerConnector<Socket> {
     private static final Logger logger = LoggerFactory.getLogger(BioConnector.class);
-    private final ServerConfig config;
+    private final Config config;
     private final ApplicationContext applicationContext;
     private final Worker worker;
     private volatile boolean running = false;
@@ -27,7 +27,7 @@ public class BioConnector implements ServerConnector<Socket> {
     private final BioAcceptor acceptor;
     private final List<Sock<Socket>> socks;
 
-    public BioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
+    public BioConnector(Worker worker, ApplicationContext applicationContext, Config config) {
         this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
@@ -39,7 +39,7 @@ public class BioConnector implements ServerConnector<Socket> {
     public void init() throws Exception {
         // BIO模式下初始化比较简单，主要是准备ServerSocket
         try {
-            serverSocket = new ServerSocket(config.getPort());
+            serverSocket = new ServerSocket(config.getServer().getPort());
         } catch (IOException e) {
             logger.error("Failed to initialize {}", getName(), e);
             throw e;
@@ -115,7 +115,7 @@ public class BioConnector implements ServerConnector<Socket> {
             }
         };
 
-        if (config.isWorkerEnabled() && worker != null) {
+        if (config.getServer().getWorker().isEnabled() && worker != null) {
             worker.execute(task);
         } else {
             task.run();

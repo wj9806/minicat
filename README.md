@@ -5,6 +5,8 @@ The features implemented are as follows:
 * Session
 * Cookie
 * Listener
+* Nio/Bio 
+* Http keep-alive
 
 The supported ContentTypes are as follows:
 * application/json

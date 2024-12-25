@@ -1,84 +1,88 @@
 package com.minicat.server.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
-import java.util.Properties;
-
-import static com.minicat.server.config.ServerConfigKeys.*;
 
 public class ServerConfig {
-    private static final Logger logger = LoggerFactory.getLogger(ServerConfig.class);
-    private static final Properties properties = new Properties();
-    private static ServerConfig instance;
-    
+
     private int port = 8080;
-    private String contextPath;
-    private String staticPath;
-    private boolean showBanner;
-    private boolean workerEnabled;
-    private int workerCoreSize;
-    private int workerMaxSize;
-    private int workerQueueSize;
-    private long workerKeepAliveTime;
-    private int httpKeepAliveTime;
+    private String contextPath = "/";
+    private List<String> staticPath = Collections.singletonList("/static");
+    private boolean showBanner = true;
     private String mode = "nio";
-    
-    private ServerConfig() {
-        loadProperties();
+
+    private WorkerConfig worker = new WorkerConfig();
+    private NioConfig nio  = new NioConfig();
+
+    public boolean nioEnabled() {
+        return Objects.equals("nio", mode);
     }
-    
-    public static ServerConfig getInstance() {
-        if (instance == null) {
-            instance = new ServerConfig();
+
+    // 内部类用于配置worker
+    public static class WorkerConfig {
+        private boolean enabled = true;
+        private int coreSize = 10;
+        private int maxSize = 50;
+        private int queueSize = 100;
+        private int keepAliveTime = 60;
+
+        // Getters and Setters
+        public boolean isEnabled() {
+            return enabled;
         }
-        return instance;
-    }
-    
-    private void loadProperties() {
-        try (InputStream input = getClass().getResourceAsStream("/minicat.properties")) {
-            if (input == null) {
-                logger.error("Unable to find minicat.properties");
-                return;
-            }
-            properties.load(input);
-            
-            // 读取配置，如果没有配置则使用默认值
-            port = Integer.parseInt(properties.getProperty(PORT, DEFAULT_PORT));
-            contextPath = properties.getProperty(CONTEXT_PATH, DEFAULT_CONTEXT_PATH);
-            staticPath = properties.getProperty(STATIC_PATH, DEFAULT_STATIC_PATH);
-            mode = properties.getProperty(SERVER_MODE, DEFAULT_SERVER_MODE);
-            showBanner = Boolean.parseBoolean(properties.getProperty(SHOW_BANNER, DEFAULT_SHOW_BANNER));
-            httpKeepAliveTime = Integer.parseInt(properties.getProperty(HTTP_KEEP_ALIVE_TIME, DEFAULT_HTTP_KEEP_ALIVE_TIME));
 
-            // 线程池配置
-            workerEnabled = Boolean.parseBoolean(properties.getProperty(WORKER_ENABLED, DEFAULT_WORKER_ENABLED));
-            workerCoreSize = Integer.parseInt(properties.getProperty(WORKER_CORE_SIZE, DEFAULT_WORKER_CORE_SIZE));
-            workerMaxSize = Integer.parseInt(properties.getProperty(WORKER_MAX_SIZE, DEFAULT_WORKER_MAX_SIZE));
-            workerQueueSize = Integer.parseInt(properties.getProperty(WORKER_QUEUE_SIZE, DEFAULT_WORKER_QUEUE_SIZE));
-            workerKeepAliveTime = Long.parseLong(properties.getProperty(WORKER_KEEP_ALIVE_TIME, DEFAULT_WORKER_KEEP_ALIVE_TIME));
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
 
-            // 确保context-path以/开头，不以/结尾
-            if (!contextPath.startsWith("/")) {
-                contextPath = "/" + contextPath;
-            }
-            if (contextPath.endsWith("/")) {
-                contextPath = contextPath.substring(0, contextPath.length() - 1);
-            }
-        } catch (IOException e) {
-            logger.error("Error loading minicat.properties", e);
+        public int getCoreSize() {
+            return coreSize;
+        }
+
+        public void setCoreSize(int coreSize) {
+            this.coreSize = coreSize;
+        }
+
+        public int getMaxSize() {
+            return maxSize;
+        }
+
+        public void setMaxSize(int maxSize) {
+            this.maxSize = maxSize;
+        }
+
+        public int getQueueSize() {
+            return queueSize;
+        }
+
+        public void setQueueSize(int queueSize) {
+            this.queueSize = queueSize;
+        }
+
+        public int getKeepAliveTime() {
+            return keepAliveTime;
+        }
+
+        public void setKeepAliveTime(int keepAliveTime) {
+            this.keepAliveTime = keepAliveTime;
         }
     }
 
-    public void setShowBanner(boolean showBanner) {
-        this.showBanner = showBanner;
+    // 内部类用于配置nio
+    public static class NioConfig {
+        private int backlog = 50;
+
+        // Getters and Setters
+        public int getBacklog() {
+            return backlog;
+        }
+
+        public void setBacklog(int backlog) {
+            this.backlog = backlog;
+        }
     }
 
-    public void setProperties(String key, String value) {
-        properties.setProperty(key, value);
-    }
 
     public int getPort() {
         return port;
@@ -92,43 +96,54 @@ public class ServerConfig {
         return contextPath;
     }
 
-    public String getStaticPath() {
+    public void setContextPath(String contextPath) {
+        // 确保context-path以/开头，不以/结尾
+        if (!contextPath.startsWith("/")) {
+            contextPath = "/" + contextPath;
+        }
+        if (contextPath.endsWith("/")) {
+            contextPath = contextPath.substring(0, contextPath.length() - 1);
+        }
+        this.contextPath = contextPath;
+    }
+
+    public List<String> getStaticPath() {
         return staticPath;
+    }
+
+    public void setStaticPath(List<String> staticPath) {
+        this.staticPath = staticPath;
     }
 
     public boolean isShowBanner() {
         return showBanner;
     }
 
-    public boolean isWorkerEnabled() {
-        return workerEnabled;
-    }
-
-    public int getWorkerCoreSize() {
-        return workerCoreSize;
-    }
-
-    public int getWorkerMaxSize() {
-        return workerMaxSize;
-    }
-
-    public int getWorkerQueueSize() {
-        return workerQueueSize;
-    }
-
-    public long getWorkerKeepAliveTime() {
-        return workerKeepAliveTime;
-    }
-
-    public int getHttpKeepAliveTime() {
-        return httpKeepAliveTime;
+    public void setShowBanner(boolean showBanner) {
+        this.showBanner = showBanner;
     }
 
     public String getMode() {
         return mode;
     }
 
-    public boolean nioEnabled() {
-        return "nio".equalsIgnoreCase(mode);
+    public void setMode(String mode) {
+        this.mode = mode;
+    }
+
+    public WorkerConfig getWorker() {
+        return worker;
+    }
+
+    public void setWorker(WorkerConfig worker) {
+        this.worker = worker;
+    }
+
+    public NioConfig getNio() {
+        return nio;
+    }
+
+    public void setNio(NioConfig nio) {
+        this.nio = nio;
     }
 }

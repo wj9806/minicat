@@ -2,6 +2,7 @@ package com.minicat.server;
 
 import com.minicat.core.ApplicationContext;
 import com.minicat.core.Lifecycle;
+import com.minicat.server.config.Config;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.server.connector.BioConnector;
 import com.minicat.server.connector.NioConnector;
@@ -19,6 +20,7 @@ import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServlet;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -27,9 +29,9 @@ public class HttpServer implements Lifecycle {
     
     private int port;
     private String contextPath;
-    private String staticPath;
+    private List<String> staticPath;
     private Worker worker;
-    private final ServerConfig config;
+    private final Config config;
     private volatile boolean running = false;
     private volatile boolean stopped = false;
     private volatile boolean destroyed = false;
@@ -39,23 +41,25 @@ public class HttpServer implements Lifecycle {
     private final long startTime;
 
     public HttpServer() {
-        this(ServerConfig.getInstance().getPort());
+        this(Config.getInstance().getServer().getPort());
     }
 
     public HttpServer(int port) {
         this.startTime = System.currentTimeMillis();
-        this.config = ServerConfig.getInstance();
-        this.config.setPort(port);
-        if (config.isShowBanner()) {
+        this.config = Config.getInstance();
+
+        ServerConfig server = this.config.getServer();
+        server.setPort(port);
+        if (server.isShowBanner()) {
             BannerPrinter.printBanner();
         }
         this.port = port;
-        this.contextPath = config.getContextPath();
-        this.staticPath = config.getStaticPath();
+        this.contextPath = server.getContextPath();
+        this.staticPath = server.getStaticPath();
         this.applicationContext = new ApplicationContext(this.config);
         //创建工作线程
         this.createWorker();
-        this.connector = config.nioEnabled()
+        this.connector = server.nioEnabled()
                 ? new NioConnector(worker, applicationContext, config)
                 : new BioConnector(worker, applicationContext, config);
         this.monitorService = new ScheduledThreadPoolExecutor(1, r -> {
@@ -117,20 +121,21 @@ public class HttpServer implements Lifecycle {
     }
 
     private void createWorker() {
-        if (!config.isWorkerEnabled()) return;
+        ServerConfig.WorkerConfig workerConfig = config.getServer().getWorker();
+        if (!workerConfig.isEnabled()) return;
 
-        WorkerQueue taskQueue = new WorkerQueue(config.getWorkerQueueSize());
+        WorkerQueue taskQueue = new WorkerQueue(workerConfig.getQueueSize());
         AtomicInteger threadNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
             Thread thread = new Thread(r);
-            thread.setName(config.getMode() + "-worker-" + threadNumber.getAndIncrement());
+            thread.setName(config.getServer().getMode() + "-worker-" + threadNumber.getAndIncrement());
             return thread;
         };
 
         worker = new Worker(
-            config.getWorkerCoreSize(),
-            config.getWorkerMaxSize(),
-            config.getWorkerKeepAliveTime(),
+            workerConfig.getCoreSize(),
+            workerConfig.getMaxSize(),
+            workerConfig.getKeepAliveTime(),
             TimeUnit.SECONDS,
             taskQueue,
             threadFactory,
@@ -141,20 +146,22 @@ public class HttpServer implements Lifecycle {
     }
 
     private void initWorker() {
-        if (!config.isWorkerEnabled()) return;
+        if (!config.getServer().getWorker().isEnabled()) return;
 
         // 允许核心线程超时
         //worker.allowCoreThreadTimeOut(true);
+        worker.prestartAllCoreThreads();
     }
 
     private void printStartupInfo() {
         logger.info("MiniCat context path: {}", contextPath.isEmpty() ? "/" : contextPath);
 
-        if (config.isWorkerEnabled()) {
+        ServerConfig.WorkerConfig workerConfig = config.getServer().getWorker();
+        if (workerConfig.isEnabled()) {
             logger.info("MiniCat worker pool: enabled, core={}, max={}, queueSize={}",
-                    config.getWorkerCoreSize(),
-                    config.getWorkerMaxSize(),
-                    config.getWorkerQueueSize());
+                    workerConfig.getCoreSize(),
+                    workerConfig.getMaxSize(),
+                    workerConfig.getQueueSize());
         } else {
             logger.info("MiniCat worker pool: disabled");
         }

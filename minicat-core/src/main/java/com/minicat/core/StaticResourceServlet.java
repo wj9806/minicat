@@ -1,7 +1,7 @@
 package com.minicat.core;
 
 import com.minicat.server.HttpServlet;
-import com.minicat.server.config.ServerConfig;
+import com.minicat.server.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +25,7 @@ public class StaticResourceServlet extends HttpServlet {
     private static final Map<String, CachedResource> resourceCache = new ConcurrentHashMap<>();
     private static final long MAX_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
     private static long currentCacheSize = 0;
-    private final ServerConfig config;
+    private final Config config;
     
     static {
         CONTENT_TYPES.put(".html", "text/html");
@@ -54,7 +54,7 @@ public class StaticResourceServlet extends HttpServlet {
         logger.info("StaticResourceServlet init..");
     }
 
-    public StaticResourceServlet(ServerConfig config) {
+    public StaticResourceServlet(Config config) {
         this.config = config;
     }
     
@@ -63,8 +63,8 @@ public class StaticResourceServlet extends HttpServlet {
             throws ServletException, IOException {
         String uri = req.getRequestURI();
         // 移除上下文路径
-        if (uri.startsWith(config.getContextPath())) {
-            uri = uri.substring(config.getContextPath().length());
+        if (uri.startsWith(config.getServer().getContextPath())) {
+            uri = uri.substring(config.getServer().getContextPath().length());
         }
 
         // 处理默认首页
@@ -73,62 +73,65 @@ public class StaticResourceServlet extends HttpServlet {
         }
         
         // 获取资源路径
-        String resourcePath = config.getStaticPath() + uri;
-        logger.debug("Looking for static resource: {}", resourcePath);
-        
-        try {
-            // 检查资源是否存在
-            CachedResource cachedResource = resourceCache.get(resourcePath);
-            if (cachedResource == null) {
-                // 资源不在缓存中，尝试加载
-                try (InputStream resourceStream = getClass().getResourceAsStream(resourcePath)) {
-                    if (resourceStream == null) {
-                        resp.sendError(HttpServletResponse.SC_NOT_FOUND,
-                                "<h1>404 Not Found</h1><p>No mapping for URL: " + uri + "</p>");
-                        return;
+        for (String staticPath : config.getServer().getStaticPath()) {
+            String resourcePath = staticPath + uri;
+            logger.debug("Looking for static resource: {}", resourcePath);
+
+            try {
+                // 检查资源是否存在
+                CachedResource cachedResource = resourceCache.get(resourcePath);
+                if (cachedResource == null) {
+                    // 资源不在缓存中，尝试加载
+                    try (InputStream resourceStream = getClass().getResourceAsStream(resourcePath)) {
+                        if (resourceStream == null) {
+                            continue;
+                        }
+                        cachedResource = loadAndCacheResource(resourcePath, resourceStream);
                     }
-                    cachedResource = loadAndCacheResource(resourcePath, resourceStream);
                 }
-            }
 
-            // 检查If-None-Match头
-            String clientEtag = req.getHeader("If-None-Match");
-            if (clientEtag != null && clientEtag.equals(cachedResource.etag)) {
-                resp.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
-                return;
-            }
+                // 检查If-None-Match头
+                String clientEtag = req.getHeader("If-None-Match");
+                if (clientEtag != null && clientEtag.equals(cachedResource.etag)) {
+                    resp.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+                    return;
+                }
 
-            // 设置Content-Type
-            String contentType = getContentType(uri);
-            resp.setContentType(contentType);
-            if (contentType.startsWith("text/") || contentType.equals("application/javascript")) {
-                resp.setCharacterEncoding("UTF-8");
-            }
-            
-            // 设置缓存控制头
-            resp.setHeader("Cache-Control", "public, max-age=" + CACHE_DURATION);
-            resp.setHeader("ETag", cachedResource.etag);
-            
-            // 检查是否支持GZIP
-            String acceptEncoding = req.getHeader("Accept-Encoding");
-            boolean supportsGzip = acceptEncoding != null && acceptEncoding.contains("gzip");
-            
-            if (supportsGzip && cachedResource.gzippedContent != null) {
-                // 发送GZIP压缩的内容
-                resp.setHeader("Content-Encoding", "gzip");
-                resp.setHeader("Content-Length", String.valueOf(cachedResource.gzippedContent.length));
-                resp.getOutputStream().write(cachedResource.gzippedContent);
-            } else {
-                // 发送原始内容
-                resp.setHeader("Content-Length", String.valueOf(cachedResource.content.length));
-                resp.getOutputStream().write(cachedResource.content);
-            }
+                // 设置Content-Type
+                String contentType = getContentType(uri);
+                resp.setContentType(contentType);
+                if (contentType.startsWith("text/") || contentType.equals("application/javascript")) {
+                    resp.setCharacterEncoding("UTF-8");
+                }
 
-        } catch (Exception e) {
-            logger.error("Error serving static resource: {}", resourcePath, e);
-            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Error reading resource: " + e.getMessage());
+                // 设置缓存控制头
+                resp.setHeader("Cache-Control", "public, max-age=" + CACHE_DURATION);
+                resp.setHeader("ETag", cachedResource.etag);
+
+                // 检查是否支持GZIP
+                String acceptEncoding = req.getHeader("Accept-Encoding");
+                boolean supportsGzip = acceptEncoding != null && acceptEncoding.contains("gzip");
+
+                if (supportsGzip && cachedResource.gzippedContent != null) {
+                    // 发送GZIP压缩的内容
+                    resp.setHeader("Content-Encoding", "gzip");
+                    resp.setHeader("Content-Length", String.valueOf(cachedResource.gzippedContent.length));
+                    resp.getOutputStream().write(cachedResource.gzippedContent);
+                } else {
+                    // 发送原始内容
+                    resp.setHeader("Content-Length", String.valueOf(cachedResource.content.length));
+                    resp.getOutputStream().write(cachedResource.content);
+                }
+
+            } catch (Exception e) {
+                logger.error("Error serving static resource: {}", resourcePath, e);
+                resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Error reading resource: " + e.getMessage());
+            }
         }
+
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND,
+                "<h1>404 Not Found</h1><p>No mapping for URL: " + uri + "</p>");
     }
     
     private CachedResource loadAndCacheResource(String resourcePath, InputStream inputStream) 

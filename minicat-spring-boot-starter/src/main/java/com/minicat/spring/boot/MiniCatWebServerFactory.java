@@ -3,6 +3,7 @@ package com.minicat.spring.boot;
 import com.minicat.MiniCat;
 import com.minicat.core.ApplicationContext;
 import com.minicat.server.HttpServer;
+import com.minicat.server.config.Config;
 import com.minicat.server.config.ServerConfig;
 import org.springframework.boot.web.server.*;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
@@ -12,8 +13,8 @@ public class MiniCatWebServerFactory extends AbstractServletWebServerFactory {
 
     @Override
     public WebServer getWebServer(ServletContextInitializer... initializers) {
-        ServerConfig serverConfig = ServerConfig.getInstance();
-        serverConfig.setShowBanner(false);
+        ServerConfig conf = Config.getInstance().getServer();
+        conf.setShowBanner(false);
 
         MiniCat miniCat = new MiniCat(getPort());
         HttpServer server = miniCat.getServer();

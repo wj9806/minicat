@@ -2,7 +2,7 @@ package com.minicat.server.connector;
 
 import com.minicat.core.ApplicationContext;
 import com.minicat.net.Sock;
-import com.minicat.server.config.ServerConfig;
+import com.minicat.server.config.Config;
 import com.minicat.server.processor.NioProcessor;
 import com.minicat.server.thread.Worker;
 import org.slf4j.Logger;
@@ -17,7 +17,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 public class NioConnector implements ServerConnector<SelectionKey> {
 
     private static final Logger logger = LoggerFactory.getLogger(NioConnector.class);
-    private final ServerConfig config;
+    private final Config config;
     private final ApplicationContext applicationContext;
     private final Worker worker;
     private Selector selector;
@@ -26,7 +26,7 @@ public class NioConnector implements ServerConnector<SelectionKey> {
     private final NioAcceptor acceptor;
     private final Set<Sock<SelectionKey>> socks;
 
-    public NioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
+    public NioConnector(Worker worker, ApplicationContext applicationContext, Config config) {
         this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
@@ -60,7 +60,8 @@ public class NioConnector implements ServerConnector<SelectionKey> {
     @Override
     public void start() throws Exception {
         running = true;
-        serverChannel.socket().bind(new InetSocketAddress(config.getPort()));
+        serverChannel.socket().bind(new InetSocketAddress(config.getServer().getPort()),
+                config.getServer().getNio().getBacklog());
         // 注册到Selector
         serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
@@ -185,7 +186,7 @@ public class NioConnector implements ServerConnector<SelectionKey> {
                 }
             };
 
-            if (config.isWorkerEnabled() && worker != null) {
+            if (config.getServer().getWorker().isEnabled() && worker != null) {
                 worker.execute(task);
             } else {
                 task.run();

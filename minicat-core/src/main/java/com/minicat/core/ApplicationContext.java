@@ -9,7 +9,7 @@ import com.minicat.http.DefaultSessionManager;
 import com.minicat.http.SessionManager;
 import com.minicat.loader.WebappClassLoader;
 import com.minicat.server.*;
-import com.minicat.server.config.ServerConfig;
+import com.minicat.server.config.Config;
 import com.minicat.core.event.EventType;
 import com.minicat.core.event.ServletContextAttributeEventObject;
 import org.slf4j.Logger;
@@ -43,20 +43,20 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     private final SessionCookieConfig sessionCookieConfig;
     private final SessionManager sessionManager;
-    private final ServerConfig config;
-    private final String staticPath;
+    private final Config config;
+    private final List<String> staticPath;
     private final Map<ServletContainerInitializer,Set<Class<?>>> initializers = new LinkedHashMap<>();
     private final InternalEventMulticast internalEventMulticast;
     private static final Logger logger = LoggerFactory.getLogger(ApplicationContext.class.getName());
 
     private WebappClassLoader classLoader;
 
-    public ApplicationContext(ServerConfig config) {
+    public ApplicationContext(Config config) {
         this.classLoader = new WebappClassLoader(ClassLoader.getSystemClassLoader());
         Thread.currentThread().setContextClassLoader(classLoader);
         this.config = config;
-        this.contextPath = config.getContextPath();
-        this.staticPath = config.getStaticPath();
+        this.contextPath = config.getServer().getContextPath();
+        this.staticPath = config.getServer().getStaticPath();
         this.internalEventMulticast = new InternalEventMulticast();
         this.sessionManager = new DefaultSessionManager();
         this.sessionCookieConfig = new ApplicationSessionCookieConfig();
