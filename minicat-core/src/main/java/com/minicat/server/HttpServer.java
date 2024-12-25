@@ -4,6 +4,7 @@ import com.minicat.core.ApplicationContext;
 import com.minicat.core.Lifecycle;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.server.connector.BioConnector;
+import com.minicat.server.connector.NioConnector;
 import com.minicat.server.connector.ServerConnector;
 import com.minicat.server.thread.WorkerQueue;
 import com.minicat.server.thread.Worker;
@@ -16,6 +17,7 @@ import javax.servlet.Filter;
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServlet;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,7 +34,8 @@ public class HttpServer implements Lifecycle {
     private volatile boolean stopped = false;
     private volatile boolean destroyed = false;
     private final ApplicationContext applicationContext;
-    private final ServerConnector connector;
+    private final ServerConnector<?> connector;
+    private final ScheduledExecutorService monitorService;
     private final long startTime;
 
     public HttpServer() {
@@ -52,7 +55,14 @@ public class HttpServer implements Lifecycle {
         this.applicationContext = new ApplicationContext(this.config);
         //创建工作线程
         this.createWorker();
-        this.connector = new BioConnector(worker, applicationContext, config);
+        this.connector = config.nioEnabled()
+                ? new NioConnector(worker, applicationContext, config)
+                : new BioConnector(worker, applicationContext, config);
+        this.monitorService = new ScheduledThreadPoolExecutor(1, r -> {
+            Thread t = new Thread(r);
+            t.setName("Monitor");
+            return t;
+        });
     }
 
     @Override
@@ -71,6 +81,8 @@ public class HttpServer implements Lifecycle {
         this.applicationContext.start();
         this.running = true;
         this.connector.start();
+        this.monitorService.scheduleWithFixedDelay(new Monitor(Collections.singletonList(connector)),
+                50, 50, TimeUnit.MILLISECONDS);
         // 打印启动信息
         printStartupInfo();
     }
@@ -98,6 +110,7 @@ public class HttpServer implements Lifecycle {
         // 销毁所有 Servlet
         this.applicationContext.destroy();
         this.connector.destroy();
+        this.monitorService.shutdown();
         
         logger.info("MiniCat Server destroyed");
         destroyed = true;
@@ -110,7 +123,7 @@ public class HttpServer implements Lifecycle {
         AtomicInteger threadNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
             Thread thread = new Thread(r);
-            thread.setName("MiniCat-Worker-" + threadNumber.getAndIncrement());
+            thread.setName(config.getMode() + "-worker-" + threadNumber.getAndIncrement());
             return thread;
         };
 

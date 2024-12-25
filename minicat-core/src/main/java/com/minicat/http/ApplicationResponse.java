@@ -1,5 +1,7 @@
 package com.minicat.http;
 
+import com.minicat.io.ResponseOutputStream;
+
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.Properties;
 
 import static com.minicat.server.config.ServerConfigKeys.*;
@@ -22,6 +23,8 @@ public class ServerConfig {
     private int workerMaxSize;
     private int workerQueueSize;
     private long workerKeepAliveTime;
+    private int httpKeepAliveTime;
+    private String mode = "nio";
     
     private ServerConfig() {
         loadProperties();
@@ -46,7 +49,9 @@ public class ServerConfig {
             port = Integer.parseInt(properties.getProperty(PORT, DEFAULT_PORT));
             contextPath = properties.getProperty(CONTEXT_PATH, DEFAULT_CONTEXT_PATH);
             staticPath = properties.getProperty(STATIC_PATH, DEFAULT_STATIC_PATH);
+            mode = properties.getProperty(SERVER_MODE, DEFAULT_SERVER_MODE);
             showBanner = Boolean.parseBoolean(properties.getProperty(SHOW_BANNER, DEFAULT_SHOW_BANNER));
+            httpKeepAliveTime = Integer.parseInt(properties.getProperty(HTTP_KEEP_ALIVE_TIME, DEFAULT_HTTP_KEEP_ALIVE_TIME));
 
             // 线程池配置
             workerEnabled = Boolean.parseBoolean(properties.getProperty(WORKER_ENABLED, DEFAULT_WORKER_ENABLED));
@@ -113,5 +118,17 @@ public class ServerConfig {
 
     public long getWorkerKeepAliveTime() {
         return workerKeepAliveTime;
+    }
+
+    public int getHttpKeepAliveTime() {
+        return httpKeepAliveTime;
+    }
+
+    public String getMode() {
+        return mode;
+    }
+
+    public boolean nioEnabled() {
+        return "nio".equalsIgnoreCase(mode);
     }
 }

@@ -25,11 +25,12 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
 
     // multipart/form-data
     private Map<String, Part> parts;
-    private String boundary;
     private boolean multipartResolved;
     private long totalSize;
 
     private final ApplicationRequest request;
+
+    private MultipartConfigElement multipartConfig;
 
     /**
      * Constructs a request object wrapping the given request.
@@ -91,7 +92,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
     }
 
     private void parseMultipart() {
-        this.boundary = "--" + buildBoundary();
+        String boundary = "--" + buildBoundary();
 
         ByteArrayInputStream bis = new ByteArrayInputStream(request.body);
         ByteArrayOutputStream currentPartData = new ByteArrayOutputStream();
@@ -132,6 +133,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                                     if (dataLength >= 2 && data[dataLength - 2] == '\r' && data[dataLength - 1] == '\n') {
                                         dataLength -= 2;
                                     }
+                                    partCheck(currentFileName, dataLength);
                                     addPart(currentPartName, currentFileName, currentPartHeaders,
                                             Arrays.copyOfRange(data, 0, dataLength));
                                 }
@@ -189,6 +191,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                                     if (dataLength >= 2 && data[dataLength - 2] == '\r' && data[dataLength - 1] == '\n') {
                                         dataLength -= 2;
                                     }
+                                    partCheck(currentFileName, dataLength);
                                     addPart(currentPartName, currentFileName, currentPartHeaders,
                                             Arrays.copyOfRange(data, 0, dataLength));
                                 }
@@ -225,6 +228,7 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
             byte[] data = currentPartData.toByteArray();
             String lastLine = new String(data, StandardCharsets.US_ASCII);
             if (!lastLine.contains(boundary)) {
+                partCheck(currentFileName, data.length);
                 addPart(currentPartName, currentFileName, currentPartHeaders, data);
             }
         }
@@ -251,36 +255,14 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
 
     private void parsePartHeader(String headerLine, Map<String, String> headers) {
         int colonIndex = headerLine.indexOf(':');
+        String headerName = headerLine.substring(0, colonIndex).trim().toLowerCase();
         if (colonIndex > 0) {
-            String headerName = headerLine.substring(0, colonIndex).trim().toLowerCase();
             String headerValue = headerLine.substring(colonIndex + 1).trim();
             headers.put(headerName, headerValue);
         }
     }
 
     private void addPart(String name, String fileName, Map<String, String> headers, byte[] content) {
-        MultipartConfigElement multipartConfig = request.getServletRegistration().getMultipartConfig();
-
-        if (multipartConfig == null)
-            throw new NullPointerException("MultipartConfigElement is null");
-
-        // 检查文件大小限制
-        if (fileName != null && multipartConfig.getMaxFileSize() > 0 && content.length > multipartConfig.getMaxFileSize()) {
-            throw new RequestParseException(String.format(
-                "File size %d exceeds the maximum allowed size %d",
-                content.length, multipartConfig.getMaxFileSize()
-            ));
-        }
-
-        // 检查总请求大小限制
-        totalSize += content.length;
-        if (multipartConfig.getMaxRequestSize() > 0 && totalSize > multipartConfig.getMaxRequestSize()) {
-            throw new RequestParseException(String.format(
-                "Total request size %d exceeds the maximum allowed size %d",
-                totalSize, multipartConfig.getMaxRequestSize()
-            ));
-        }
-
         Part part = new PartImpl(name, fileName, headers, content);
         if (parts == null)
             parts = new HashMap<>();
@@ -299,6 +281,31 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                 newValues[existingValues.length] = value;
                 request.parameters.put(name, newValues);
             }
+        }
+    }
+
+    private void partCheck(String fileName, long dataLength) {
+        if (this.multipartConfig == null) {
+            this.multipartConfig = this.request.getServletRegistration().getMultipartConfig();
+            if (this.multipartConfig == null)
+                throw new NullPointerException("MultipartConfigElement is null");
+        }
+
+        // 检查文件大小限制
+        if (fileName != null && multipartConfig.getMaxFileSize() > 0 && dataLength > multipartConfig.getMaxFileSize()) {
+            throw new RequestParseException(String.format(
+                "File size %d exceeds the maximum allowed size %d",
+                    dataLength, multipartConfig.getMaxFileSize()
+            ));
+        }
+
+        // 检查总请求大小限制
+        totalSize += dataLength;
+        if (multipartConfig.getMaxRequestSize() > 0 && totalSize > multipartConfig.getMaxRequestSize()) {
+            throw new RequestParseException(String.format(
+                "Total request size %d exceeds the maximum allowed size %d",
+                totalSize, multipartConfig.getMaxRequestSize()
+            ));
         }
     }
 
@@ -325,5 +332,6 @@ public class MultipartHttpServletRequest extends HttpServletRequestWrapper imple
                 parts.get(key).delete();
             }
         }
+        parts = null;
     }
 }

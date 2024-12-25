@@ -1,5 +1,6 @@
 package com.minicat.server.connector;
 
+import com.minicat.net.Sock;
 import com.minicat.server.config.ServerConfig;
 import com.minicat.core.ApplicationContext;
 import com.minicat.server.processor.BioProcessor;
@@ -12,12 +13,11 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 /**
  * BIO连接器实现
  */
-public class BioConnector implements ServerConnector {
+public class BioConnector implements ServerConnector<Socket> {
     private static final Logger logger = LoggerFactory.getLogger(BioConnector.class);
     private final ServerConfig config;
     private final ApplicationContext applicationContext;
@@ -25,20 +25,14 @@ public class BioConnector implements ServerConnector {
     private volatile boolean running = false;
     private ServerSocket serverSocket;
     private final BioAcceptor acceptor;
-    private final List<BioProcessor> processors;
-    private final ScheduledExecutorService executorService;
+    private final List<Sock<Socket>> socks;
 
     public BioConnector(Worker worker, ApplicationContext applicationContext, ServerConfig config) {
         this.worker = worker;
         this.applicationContext = applicationContext;
         this.config = config;
         this.acceptor = new BioAcceptor();
-        this.processors = new CopyOnWriteArrayList<>();
-        this.executorService = new ScheduledThreadPoolExecutor(1, r -> {
-            Thread t = new Thread(r);
-            t.setName("Monitor");
-            return t;
-        });
+        this.socks = new CopyOnWriteArrayList<>();
     }
 
     @Override
@@ -56,7 +50,6 @@ public class BioConnector implements ServerConnector {
     public void start() throws Exception {
         running = true;
         acceptor.start();
-        executorService.scheduleWithFixedDelay(new Monitor(), 50, 50, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -64,7 +57,6 @@ public class BioConnector implements ServerConnector {
         running = false;
         acceptor.interrupt();
         logger.info("{} stopping...", getName());
-        executorService.shutdown();
 
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
@@ -86,17 +78,31 @@ public class BioConnector implements ServerConnector {
         return "BioConnector";
     }
 
+    @Override
+    public List<Sock<Socket>> getSocks() {
+        return socks;
+    }
+
+    public void addSock(Sock<Socket> sock) {
+        socks.add(sock);
+    }
+
+    public void removeSock(Sock<Socket> sock) {
+        socks.remove(sock);
+    }
+
     private void handleSocket(Socket socket) {
         Runnable task = () -> {
             BioProcessor processor = null;
             try {
                 processor = new BioProcessor(applicationContext, socket);
-                processors.add(processor);
+                Sock<Socket> sock = processor.sock();
+                addSock(sock);
                 while (true) {
                     if (processor.process() == -1)
                         break;
                 }
-                processors.remove(processor);
+                removeSock(sock);
             } catch (Exception e) {
                 logger.error("Error processing request", e);
             } finally {
@@ -138,20 +144,4 @@ public class BioConnector implements ServerConnector {
         }
     }
 
-    class Monitor implements Runnable {
-        @Override
-        public void run() {
-            List<BioProcessor> removed = processors.stream()
-                    .filter(p -> System.currentTimeMillis() - p.getLastProcess() > 35000)
-                    .collect(Collectors.toList());
-            processors.removeAll(removed);
-            for (BioProcessor processor : removed) {
-                try {
-                    processor.destroy();
-                } catch (Exception e) {
-                    logger.error("remove processor failed", e);
-                }
-            }
-        }
-    }
 }

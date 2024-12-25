@@ -6,6 +6,7 @@ import com.minicat.core.event.EventType;
 import com.minicat.core.event.HttpSessionIdEventObject;
 import com.minicat.core.event.ServletRequestAttributeEventObject;
 import com.minicat.core.Lifecycle;
+import com.minicat.io.RequestInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,4 +1,4 @@
-package com.minicat.http;
+package com.minicat.io;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
