@@ -12,23 +12,26 @@ import javax.servlet.FilterChain;
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.WebConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Objects;
 
 /**
  * 请求处理器接口
  */
-public abstract class Processor<S> implements Lifecycle {
+public abstract class Processor<S> implements Lifecycle, WebConnection {
     static final int BUFFER_SIZE = 1024;
 
     protected final ApplicationContext applicationContext;
     protected final Sock<S> sock;
+
+    protected OutputStream hos;
 
     public Processor(ApplicationContext applicationContext, Sock<S> sock) {
         this.applicationContext = applicationContext;
@@ -57,6 +60,14 @@ public abstract class Processor<S> implements Lifecycle {
 
     public Sock<S> sock() {
         return sock;
+    }
+
+    public void send(ByteBuffer buf) throws IOException {
+        hos.write(buf.array());
+    }
+
+    public void flush() throws IOException {
+        hos.flush();
     }
 
     /**
@@ -169,7 +180,7 @@ public abstract class Processor<S> implements Lifecycle {
                     String[] lines = headerContent.split("\r\n");
 
                     // 创建request对象并设置基本信息
-                    servletRequest = new ApplicationRequest(applicationContext, lines);
+                    servletRequest = new ApplicationRequest(applicationContext, socket, lines);
                     prepareHeaders(lines, servletRequest);
                     prepareRemoteInfo(socket, servletRequest);
                     prepareLocalInfo(socket, servletRequest);
@@ -313,7 +324,8 @@ public abstract class Processor<S> implements Lifecycle {
 
     protected boolean keepAlive(HttpServletRequest servletRequest) {
         String connection = servletRequest.getHeader("connection");
-        return Objects.equals(connection, "keep-alive");
+        return HttpHeaders.KEEP_ALIVE.equalsIgnoreCase(connection)
+                || HttpHeaders.UPGRADE.equalsIgnoreCase(connection);
     }
 
 

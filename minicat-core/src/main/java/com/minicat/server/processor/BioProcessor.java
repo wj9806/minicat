@@ -6,6 +6,8 @@ import com.minicat.net.Sock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletInputStream;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.Socket;
@@ -15,18 +17,19 @@ import java.net.Socket;
  */
 public class BioProcessor extends Processor<Socket> {
     private static final Logger logger = LoggerFactory.getLogger(BioProcessor.class);
-    private final OutputStream hos;
     private final InputStream his;
     private boolean closed = false;
 
-    public BioProcessor(ApplicationContext applicationContext, Socket socket) {
-        super(applicationContext, Sock.from(socket));
+    public BioProcessor(ApplicationContext applicationContext, Sock<Socket> s) {
+        super(applicationContext, s);
+        Socket socket = s.source();
         try {
             this.hos = socket.getOutputStream();
             this.his = socket.getInputStream();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        s.setProcessor(this);
     }
 
     @Override
@@ -89,4 +92,18 @@ public class BioProcessor extends Processor<Socket> {
         sock.close();
     }
 
+    @Override
+    public ServletInputStream getInputStream() throws IOException {
+        return null;
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return null;
+    }
+
+    @Override
+    public void close() throws Exception {
+        destroy();
+    }
 }

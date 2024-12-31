@@ -1,11 +1,22 @@
 package com.minicat.http;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 
 /**
  * HTTP请求/响应头处理类
  */
 public class HttpHeaders {
+
+    public static final String CONNECTION = "connection";
+    public static final String ORIGIN = "Origin";
+    public static final String UPGRADE = "upgrade";
+    public static final String KEEP_ALIVE = "keep-alive";
+    public static final String WEBSOCKET_KEY_NAME = "sec-websocket-key";
+    public static final String WEBSOCKET_VERSION_NAME = "sec-websocket-version";
+    public static final String WEBSOCKET_EXTENSION = "sec-websocket-extensions";
+    public static final String WEBSOCKET_ACCEPT = "sec-websocket-accept";
+
     private final Map<String, List<String>> headers = new HashMap<>();
 
     /**
@@ -181,5 +192,20 @@ public class HttpHeaders {
                lowerName.equals("upgrade") ||
                lowerName.equals("via") ||
                lowerName.equals("warning");
+    }
+
+    public static boolean containsHeader(HttpServletRequest req, String name, String value) {
+        Enumeration<String> reqHeaders = req.getHeaders(name);
+        while (reqHeaders.hasMoreElements()) {
+            String v = reqHeaders.nextElement();
+            if (value.equalsIgnoreCase(v))
+                return true;
+        }
+        return false;
+    }
+
+    public static boolean containsHeader(HttpServletRequest req, String name) {
+        Enumeration<String> reqHeaders = req.getHeaders(name);
+        return reqHeaders.hasMoreElements();
     }
 }

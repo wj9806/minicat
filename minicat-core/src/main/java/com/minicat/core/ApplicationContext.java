@@ -725,8 +725,12 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
                 WebappClassLoader classLoader = (WebappClassLoader)Thread.currentThread().getContextClassLoader();
                 if (isCandidate(classFileInfo, clazz)) {
                     Class<?> loadedClass = classLoader.loadClass(cn, Files.newInputStream(file.toPath()));
-                    if (clazz.isAssignableFrom(loadedClass) && loadedClass != clazz) {
+                    if ((clazz.isAssignableFrom(loadedClass) && loadedClass != clazz)) {
                         result.add(loadedClass);
+                    } else {
+                        if (clazz.isAnnotation()) {
+                            result.add(loadedClass);
+                        }
                     }
                 }
             }
@@ -734,11 +738,17 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     }
 
     private boolean isCandidate(ClassFileInfo classFileInfo, Class<?> clazz) {
+        String curName = clazz.getName();
+        Set<String> annotations = classFileInfo.getAnnotations();
+        if (clazz.isAnnotation()) {
+            if (annotations.stream().anyMatch(a -> Objects.equals(a, curName)))
+                return true;
+        }
+
+
         String className = classFileInfo.getClassName();
         String superClassName = classFileInfo.getSuperClassName();
         Set<String> interfaceNames = classFileInfo.getInterfaceNames();
-
-        String curName = clazz.getName();
 
         if (curName.equals(className)) {
             return true;

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 
 public class SocketChannelOutputStream extends ByteArrayOutputStream {
 
@@ -21,6 +22,9 @@ public class SocketChannelOutputStream extends ByteArrayOutputStream {
         if (socketChannel.isOpen()) {
             ByteBuffer buf = ByteBuffer.wrap(super.toByteArray());
             socketChannel.write(buf);
+
+            Arrays.fill(super.buf, (byte)0);
+            count = 0;
         }
     }
 

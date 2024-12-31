@@ -1,7 +1,10 @@
 package com.minicat.net;
 
+import com.minicat.server.processor.Processor;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
@@ -13,6 +16,7 @@ class NSock implements Sock<SelectionKey> {
     private long lastProcess;
     private final SocketChannel sc;
     private final SelectionKey key;
+    private Processor<SelectionKey> p;
 
     NSock(SelectionKey key) {
         this.sc = (SocketChannel) key.channel();
@@ -49,6 +53,16 @@ class NSock implements Sock<SelectionKey> {
     @Override
     public SelectionKey source() {
         return key;
+    }
+
+    @Override
+    public void setProcessor(Processor<SelectionKey> p) {
+        this.p = p;
+    }
+
+    @Override
+    public Processor<SelectionKey> processor() {
+        return p;
     }
 
     @Override

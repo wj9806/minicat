@@ -95,7 +95,7 @@ public class BioConnector implements ServerConnector<Socket> {
         Runnable task = () -> {
             BioProcessor processor = null;
             try {
-                processor = new BioProcessor(applicationContext, socket);
+                processor = new BioProcessor(applicationContext, Sock.from(socket));
                 Sock<Socket> sock = processor.sock();
                 addSock(sock);
                 while (true) {

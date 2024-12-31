@@ -174,7 +174,7 @@ public class InternalEventMulticast {
     private void fireHttpSessionAttributeEvent(HttpSessionAttributeEventObject event) {
         if (httpSessionAttributeListeners == null) return;
         for (HttpSessionAttributeListener listener : httpSessionAttributeListeners) {
-            switch (event.getType()) {
+            switch (event.getEventType()) {
                 case SESSION_ATTRIBUTE_ADDED:
                     listener.attributeAdded(event);
                     break;

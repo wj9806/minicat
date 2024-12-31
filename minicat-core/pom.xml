@@ -23,6 +23,11 @@
             <artifactId>javax.servlet-api</artifactId>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>javax.websocket</groupId>
+            <artifactId>javax.websocket-api</artifactId>
+            <scope>compile</scope>
+        </dependency>
         <!-- 添加slf4j依赖 -->
         <dependency>
             <groupId>org.slf4j</groupId>

@@ -115,6 +115,7 @@ public class ApplicationResponse implements HttpServletResponse {
     private String getStatusMessage(int status) {
         switch (status) {
             case SC_OK: return "OK";
+            case SC_SWITCHING_PROTOCOLS: return "Switching Protocols";
             case SC_NOT_FOUND: return "Not Found";
             case SC_INTERNAL_SERVER_ERROR: return "Internal Server Error";
             case SC_FOUND: return "Found";
@@ -373,6 +374,10 @@ public class ApplicationResponse implements HttpServletResponse {
      * 添加标准HTTP响应头
      */
     private void addStandardHeaders() {
+        if (headers.contains(HttpHeaders.UPGRADE)) {
+            return;
+        }
+
         // Add Date header
         if (!headers.contains("date")) {
             headers.set("Date", formatDate(System.currentTimeMillis()));

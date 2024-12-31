@@ -7,6 +7,8 @@ import com.minicat.net.Sock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletInputStream;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -22,13 +24,12 @@ public class NioProcessor extends Processor<SelectionKey> implements AutoCloseab
 
     public final SocketChannel socketChannel;
 
-    private final OutputStream hos;
-
     public NioProcessor(ApplicationContext applicationContext, Sock<SelectionKey> s) {
         super(applicationContext, s);
         this.key = s.source();
         this.socketChannel = (SocketChannel) key.channel();
         this.hos = new SocketChannelOutputStream(socketChannel);
+        s.setProcessor(this);
     }
 
     @Override
@@ -95,5 +96,15 @@ public class NioProcessor extends Processor<SelectionKey> implements AutoCloseab
     public void destroy() throws Exception {
         close();
         sock.close();
+    }
+
+    @Override
+    public ServletInputStream getInputStream() throws IOException {
+        return null;
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return null;
     }
 }

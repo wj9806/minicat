@@ -7,6 +7,9 @@ import com.minicat.core.event.HttpSessionIdEventObject;
 import com.minicat.core.event.ServletRequestAttributeEventObject;
 import com.minicat.core.Lifecycle;
 import com.minicat.io.RequestInputStream;
+import com.minicat.net.Sock;
+import com.minicat.server.Constants;
+import com.minicat.ws.WsServerContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +73,7 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
     private boolean requestedSessionIdFromCookie;
     private boolean requestedSessionIdFromURL;
 
-    public ApplicationRequest(ApplicationContext context, String[] lines) {
+    public ApplicationRequest(ApplicationContext context, Sock<?> sock, String[] lines) {
         String[] requestLine = lines[0].split(" ");
 
         if (requestLine.length < 3) throw new RequestParseException("requestLine != 3");
@@ -93,6 +96,8 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
         }
 
         this.servletContext = context;
+
+        setAttribute(Constants.REQUEST_SOCK, sock);
     }
 
     /**
@@ -466,7 +471,21 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
     }
 
     @Override
-    public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) { return null; }
+    public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) {
+        // 创建 WebSocket 处理程序实例
+        T handler = null;
+        try {
+            handler = handlerClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upgrade to WebSocket", e);
+        }
+
+        // 获取 WebSocket 服务器容器并执行升级
+        WsServerContainer serverContainer = (WsServerContainer) servletContext.getAttribute("javax.websocket.server.ServerContainer");
+        serverContainer.upgrade(this, handler);
+
+        return handler;
+    }
 
     @Override
     public Object getAttribute(String name) {

@@ -17,6 +17,7 @@ public class ClassParser {
             private String className;
             private String superClassName;
             private Set<String> interfaceNames = new HashSet<>();
+            private Set<String> annotations = new HashSet<>();
 
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
@@ -27,6 +28,13 @@ public class ClassParser {
                         interfaceNames.add(iface.replace('/', '.'));
                     }
                 }
+            }
+
+            @Override
+            public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                String annotationName = descriptor.replace('/', '.').substring(1, descriptor.length() - 1);
+                annotations.add(annotationName);
+                return super.visitAnnotation(descriptor, visible);
             }
 
             @Override
@@ -46,7 +54,7 @@ public class ClassParser {
                         bytes = byteStream.toByteArray();
                     }
 
-                    classFileInfoHolder[0] = new ClassFileInfo(className, superClassName, allInterfaces, bytes);
+                    classFileInfoHolder[0] = new ClassFileInfo(className, superClassName, allInterfaces, annotations, bytes);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

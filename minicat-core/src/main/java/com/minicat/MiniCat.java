@@ -32,6 +32,7 @@ public class MiniCat implements Lifecycle {
             server.init();
         } catch (Exception e) {
             logger.error("Server init failed", e);
+            throw new RuntimeException(e);
         }
     }
 
