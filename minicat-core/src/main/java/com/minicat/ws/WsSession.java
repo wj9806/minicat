@@ -1,6 +1,6 @@
 package com.minicat.ws;
 
-import com.minicat.server.processor.Processor;
+import com.minicat.ws.processor.WsProcessor;
 
 import javax.websocket.*;
 import javax.websocket.server.ServerEndpointConfig;
@@ -36,10 +36,10 @@ public class WsSession implements Session {
     private final EndpointHandler handler;
     private final Endpoint endpoint;
     private final RemoteEndpoint.Basic basicRemote;
-    private final Processor<?> processor;
+    private final WsProcessor<?> processor;
 
     public WsSession(WebSocketContainer container, EndpointHandler handler,
-                     WsHandshakeRequest wsReq, ServerEndpointConfig sec, Processor<?> processor) {
+                     WsHandshakeRequest wsReq, ServerEndpointConfig sec, WsProcessor<?> processor) {
         this.container = container;
         this.handler = handler;
         this.userProperties.putAll(sec.getUserProperties());
@@ -220,4 +220,7 @@ public class WsSession implements Session {
         return Collections.unmodifiableSet(openSessions);
     }
 
+    public EndpointHandler getHandler() {
+        return handler;
+    }
 }

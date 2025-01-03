@@ -1,6 +1,6 @@
 package com.minicat.ws;
 
-import com.minicat.server.processor.Processor;
+import com.minicat.ws.processor.WsProcessor;
 
 import javax.websocket.EncodeException;
 import javax.websocket.RemoteEndpoint;
@@ -9,19 +9,24 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 public class BasicRemoteEndpoint implements RemoteEndpoint.Basic {
 
-    private final Processor<?> processor;
+    private final WsProcessor<?> processor;
 
-    public BasicRemoteEndpoint(Processor<?> processor) {
+    public BasicRemoteEndpoint(WsProcessor<?> processor) {
         this.processor = processor;
     }
 
     @Override
     public void sendText(String text) throws IOException {
-        byte[] payload = text.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8));
+        sendBinary(buffer);
+    }
+
+    @Override
+    public void sendBinary(ByteBuffer data) throws IOException {
+        int capacity = data.capacity();
 
         // 创建帧头
         byte firstByte = (byte) (0x80 | 0x01); // FIN=1, RSV1-3=0, Opcode=1 (text)
@@ -29,44 +34,38 @@ public class BasicRemoteEndpoint implements RemoteEndpoint.Basic {
         int headerLength;
 
         // 设置负载长度
-        if (payload.length < 126) {
+        if (capacity < 126) {
             headerLength = 2;
-        } else if (payload.length <= 65535) {
+        } else if (capacity <= 65535) {
             headerLength = 4;
         } else {
             headerLength = 10;
         }
 
         // 分配缓冲区
-        ByteBuffer buffer = ByteBuffer.allocate(headerLength + payload.length);
+        ByteBuffer buffer = ByteBuffer.allocate(headerLength + capacity);
 
         // 写入帧头
         buffer.put(firstByte);
-        if (payload.length < 126) {
-            buffer.put((byte) payload.length); // Masked bit = 0
-        } else if (payload.length <= 65535) {
+        if (capacity < 126) {
+            buffer.put((byte) capacity); // Masked bit = 0
+        } else if (capacity <= 65535) {
             buffer.put((byte) 126); // Extended payload length
-            buffer.putShort((short) payload.length);
+            buffer.putShort((short) capacity);
         } else {
             buffer.put((byte) 127); // Extended payload length
             for (int i = 7; i >= 0; i--) {
-                buffer.put((byte) ((payload.length >> (8 * i)) & 0xFF));
+                buffer.put((byte) ((capacity >> (8 * i)) & 0xFF));
             }
         }
 
         // 写入负载数据
-        buffer.put(payload);
+        buffer.put(data);
 
         buffer.flip();
         // 发送数据
-        processor.send(buffer); // 假设 processor 支持 ByteBuffer 类型
-        processor.flush(); // 如果需要，刷新缓冲区
-        System.out.println("Frame content: " + Arrays.toString(buffer.array()));
-    }
-
-    @Override
-    public void sendBinary(ByteBuffer data) throws IOException {
-
+        processor.send(buffer);
+        processor.flush();
     }
 
     @Override

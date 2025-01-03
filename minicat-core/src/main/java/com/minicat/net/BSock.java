@@ -1,11 +1,9 @@
 package com.minicat.net;
 
-import com.minicat.server.processor.Processor;
+import com.minicat.ws.processor.WsProcessor;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.util.Objects;
 
 class BSock implements Sock<Socket> {
@@ -13,7 +11,7 @@ class BSock implements Sock<Socket> {
     InetSocketAddress l;
     private long lastProcess;
     private final Socket s;
-    private Processor<Socket> p;
+    private WsProcessor<Socket> p;
 
     BSock(Socket s) {
         this.r = new InetSocketAddress(s.getInetAddress(), s.getPort());
@@ -48,17 +46,20 @@ class BSock implements Sock<Socket> {
     }
 
     @Override
-    public void setProcessor(Processor<Socket> p) {
+    public void setWsProcessor(WsProcessor<Socket> p) {
         this.p = p;
     }
 
     @Override
-    public Processor<Socket> processor() {
+    public WsProcessor<Socket> wsProcessor() {
         return p;
     }
 
     @Override
     public void close() throws Exception {
+        if (p != null) {
+            p.close();
+        }
         s.close();
     }
 

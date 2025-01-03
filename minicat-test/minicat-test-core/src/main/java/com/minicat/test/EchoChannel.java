@@ -31,7 +31,7 @@ public class EchoChannel {
         }
 
 
-        this.session.getAsyncRemote().sendText("["+ Instant.now().toEpochMilli() +"] Hello " + message);
+        this.session.getBasicRemote().sendText("["+ Instant.now().toEpochMilli() +"] Hello " + message);
     }
 
     // 连接打开

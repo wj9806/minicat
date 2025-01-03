@@ -68,7 +68,7 @@ public class StaticResourceServlet extends HttpServlet {
         }
 
         // 处理默认首页
-        if (uri.equals("/") || uri.equals("")) {
+        if (uri.equals("/") || uri.isEmpty()) {
             uri = "/index.html";
         }
         
@@ -117,16 +117,19 @@ public class StaticResourceServlet extends HttpServlet {
                     resp.setHeader("Content-Encoding", "gzip");
                     resp.setHeader("Content-Length", String.valueOf(cachedResource.gzippedContent.length));
                     resp.getOutputStream().write(cachedResource.gzippedContent);
+                    return;
                 } else {
                     // 发送原始内容
                     resp.setHeader("Content-Length", String.valueOf(cachedResource.content.length));
                     resp.getOutputStream().write(cachedResource.content);
+                    return;
                 }
 
             } catch (Exception e) {
                 logger.error("Error serving static resource: {}", resourcePath, e);
                 resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                         "Error reading resource: " + e.getMessage());
+                return;
             }
         }
 

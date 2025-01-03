@@ -6,8 +6,6 @@ import com.minicat.net.Sock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletInputStream;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.Socket;
@@ -29,7 +27,6 @@ public class BioProcessor extends Processor<Socket> {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        s.setProcessor(this);
     }
 
     @Override
@@ -93,17 +90,7 @@ public class BioProcessor extends Processor<Socket> {
     }
 
     @Override
-    public ServletInputStream getInputStream() throws IOException {
-        return null;
-    }
-
-    @Override
-    public ServletOutputStream getOutputStream() throws IOException {
-        return null;
-    }
-
-    @Override
     public void close() throws Exception {
-        destroy();
+
     }
 }

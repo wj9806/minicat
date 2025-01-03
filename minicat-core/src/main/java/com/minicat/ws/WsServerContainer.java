@@ -141,6 +141,9 @@ public class WsServerContainer implements ServerContainer {
         if (handler instanceof WsHttpUpgradeHandler) {
             upgradeHandlerMap.put(sock, (WsHttpUpgradeHandler) handler);
         }
+    }
 
+    public WsHttpUpgradeHandler getUpgradeHandler(Sock<?> sock) {
+        return upgradeHandlerMap.get(sock);
     }
 }

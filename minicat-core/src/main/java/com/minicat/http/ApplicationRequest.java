@@ -9,6 +9,7 @@ import com.minicat.core.Lifecycle;
 import com.minicat.io.RequestInputStream;
 import com.minicat.net.Sock;
 import com.minicat.server.Constants;
+import com.minicat.ws.WsConstants;
 import com.minicat.ws.WsServerContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -481,7 +482,7 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
         }
 
         // 获取 WebSocket 服务器容器并执行升级
-        WsServerContainer serverContainer = (WsServerContainer) servletContext.getAttribute("javax.websocket.server.ServerContainer");
+        WsServerContainer serverContainer = (WsServerContainer) servletContext.getAttribute(WsConstants.WS_SERVER_CONTAINER_ATTRIBUTE);
         serverContainer.upgrade(this, handler);
 
         return handler;

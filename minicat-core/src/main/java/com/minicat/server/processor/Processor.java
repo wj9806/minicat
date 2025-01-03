@@ -6,13 +6,13 @@ import com.minicat.core.event.EventType;
 import com.minicat.core.event.ServletRequestEventObject;
 import com.minicat.http.*;
 import com.minicat.net.Sock;
+import com.minicat.server.IProcessor;
 import org.slf4j.Logger;
 
 import javax.servlet.FilterChain;
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.WebConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,7 +25,7 @@ import java.util.Base64;
 /**
  * 请求处理器接口
  */
-public abstract class Processor<S> implements Lifecycle, WebConnection {
+public abstract class Processor<S> implements IProcessor<S>, Lifecycle {
     static final int BUFFER_SIZE = 1024;
 
     protected final ApplicationContext applicationContext;
@@ -70,11 +70,6 @@ public abstract class Processor<S> implements Lifecycle, WebConnection {
         hos.flush();
     }
 
-    /**
-     * 处理请求
-     * @throws Exception 处理过程中可能出现的异常
-     * @return 等于0 说明处理正常 等于-1说明处理完成
-     */
     public int process() throws Exception {
         HttpServletRequest servletRequest = null;
         try {

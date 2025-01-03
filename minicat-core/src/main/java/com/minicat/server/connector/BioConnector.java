@@ -99,8 +99,12 @@ public class BioConnector implements ServerConnector<Socket> {
                 Sock<Socket> sock = processor.sock();
                 addSock(sock);
                 while (true) {
-                    if (processor.process() == -1)
-                        break;
+                    if (sock.wsProcessor() == null) {
+                        if (processor.process() == -1)
+                            break;
+                    } else {
+                        sock.wsProcessor().process();
+                    }
                 }
                 removeSock(sock);
             } catch (Exception e) {

@@ -3,10 +3,12 @@ package com.minicat.ws;
 import com.minicat.http.HttpHeaders;
 import com.minicat.net.Sock;
 import com.minicat.server.Constants;
+import com.minicat.ws.processor.WsProcessor;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.WebConnection;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -107,7 +109,8 @@ public class WsFilter implements Filter {
         hand.setServerContainer(sc);
 
         Sock<?> sock = (Sock<?>) req.getAttribute(Constants.REQUEST_SOCK);
-        hand.init(sock.processor());
+        WebConnection webConnection = WsProcessor.createWebConnection(sock);
+        hand.init(webConnection);
     }
 
     @Override

@@ -72,6 +72,33 @@ public class EndpointMetadata {
         }
     }
 
+    public void onClose(Object endpoint, Session session, CloseReason closeReason) {
+        Object[] args = new Object[closeParams.length];
+
+        for (int i = 0; i < closeParams.length; i++) {
+            EndpointParam param = closeParams[i];
+            if (Session.class.equals(param.getType())) {
+                args[i] = session;
+            } else if (CloseReason.class.equals(param.getType())) {
+                args[i] = closeReason;
+            } else if (param.getName() != null) {
+                args[i] = session.getPathParameters().get(param.getName());
+            } else {
+                args[i] = null;
+            }
+        }
+
+        try {
+            close.invoke(endpoint, args);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public MessageHandlerMetadata getMessageMetadata() {
+        return message;
+    }
+
     public static class MessageHandlerMetadata {
         private Method message;
         private EndpointParam[] params;

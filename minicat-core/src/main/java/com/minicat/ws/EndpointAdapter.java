@@ -20,8 +20,14 @@ public class EndpointAdapter extends Endpoint {
     }
 
     public void onClose(Session session, CloseReason closeReason) {
+        EndpointMetadata endpointMethod = handler.getEndpointMethod();
+        endpointMethod.onClose(endpoint, session, closeReason);
     }
 
     public void onError(Session session, Throwable thr) {
+    }
+
+    public Object getSource() {
+        return endpoint;
     }
 }

@@ -1,11 +1,9 @@
 package com.minicat.net;
 
-import com.minicat.server.processor.Processor;
+import com.minicat.ws.processor.WsProcessor;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
 /**
@@ -29,9 +27,9 @@ public interface Sock<S> {
 
     S source();
 
-    void setProcessor(Processor<S> p);
+    void setWsProcessor(WsProcessor<S> p);
 
-    Processor<S> processor();
+    WsProcessor<S> wsProcessor();
 
     void close() throws Exception;
 
