@@ -9,6 +9,7 @@ import com.minicat.ws.WsServerContainer;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.WebConnection;
+import javax.websocket.CloseReason;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -20,7 +21,7 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
 
     protected Sock<S> sock;
 
-    private InputStream is;
+    protected InputStream is;
     protected OutputStream os;
 
     protected WsServerContainer sc;
@@ -74,22 +75,42 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
         // 处理不同类型的帧
         switch (opcode) {
             case WsConstants.OPCODE_TEXT: // 文本帧
-                System.out.println("OPCODE_TEXT");
                 onMessage(payload);
                 break;
             case WsConstants.OPCODE_CLOSE: // 关闭帧
-                System.out.println("OPCODE_CLOSE");
+                CloseReason closeReason = getCloseCode(payloadLength, payload);
+                onClose(closeReason);
                 return -1;
             case WsConstants.OPCODE_PING: // Ping
-                System.out.println("OPCODE_PING");
                 break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + opcode);
         }
         return 0;
+    }
+
+    private static CloseReason getCloseCode(int payloadLength, byte[] payload) {
+        String reason = "";
+        CloseReason.CloseCode code = CloseReason.CloseCodes.NORMAL_CLOSURE;
+        if (payloadLength >= 2) {
+            int closeCode = (payload[0] << 8) | (payload[1] & 0xFF);
+            code = CloseReason.CloseCodes.getCloseCode(closeCode);
+
+            if (payloadLength > 2) {
+                reason = new String(payload, 2, payloadLength - 2);
+            }
+        }
+        return new CloseReason(code, reason);
     }
 
     private void onMessage(byte[] payload) {
         WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
         upgradeHandler.onMessage(payload);
+    }
+
+    private void onClose(CloseReason closeReason) throws IOException {
+        WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
+        upgradeHandler.onClose(closeReason);
     }
 
     protected abstract OutputStream initOutputStream() throws IOException;
@@ -124,6 +145,7 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     public static WsProcessor<?> createWebConnection(Sock<?> s) throws IOException {
         Object source = s.source();
         if (source instanceof Socket) {

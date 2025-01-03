@@ -164,7 +164,23 @@ public class WebsocketTest {
                         sendMessage("服务器收到: " + message);
                         break;
 
+
                     case 0x8: // 关闭帧
+                        System.out.println("收到关闭帧");
+
+                        int closeCode = 1000; // 默认关闭状态码
+                        String reason = "";
+
+                        if (payloadLength >= 2) {
+                            closeCode = (payload[0] << 8) | (payload[1] & 0xFF);
+                            if (payloadLength > 2) {
+                                reason = new String(payload, 2, payloadLength - 2);
+                            }
+                        }
+
+                        System.out.println("关闭原因: 状态码=" + closeCode + ", 原因=" + reason);
+
+                        sendCloseFrame(closeCode, reason);
                         return;
 
                     case 0x9: // Ping
@@ -204,6 +220,33 @@ public class WebsocketTest {
             out.write(0x8A); // FIN=1, Opcode=0xA (Pong)
             out.write(0x00); // 空负载
             out.flush();
+        }
+
+        private void sendCloseFrame(int closeCode, String reason) throws IOException {
+            ByteArrayOutputStream frame = new ByteArrayOutputStream();
+
+            frame.write(0x88);
+
+            byte[] reasonBytes = reason != null ? reason.getBytes() : new byte[0];
+            int payloadLength = 2 + reasonBytes.length;
+
+            if (payloadLength < 126) {
+                frame.write(payloadLength);
+            } else if (payloadLength < 65536) {
+                frame.write(126);
+                frame.write(payloadLength >> 8);
+                frame.write(payloadLength & 0xFF);
+            }
+
+            frame.write(closeCode >> 8);
+            frame.write(closeCode & 0xFF);
+
+            frame.write(reasonBytes);
+
+            out.write(frame.toByteArray());
+            out.flush();
+
+            System.out.println("发送关闭帧: 状态码=" + closeCode + ", 原因=" + reason);
         }
     }
 

@@ -4,8 +4,10 @@ import com.minicat.ws.processor.WsProcessor;
 
 import javax.websocket.*;
 import javax.websocket.server.ServerEndpointConfig;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -222,5 +224,33 @@ public class WsSession implements Session {
 
     public EndpointHandler getHandler() {
         return handler;
+    }
+
+    public void sendCloseFrame(CloseReason closeReason) throws IOException {
+        String reason = closeReason.getReasonPhrase();
+        int closeCode = closeReason.getCloseCode().getCode();
+
+        ByteArrayOutputStream frame = new ByteArrayOutputStream();
+
+        frame.write(0x88);
+
+        byte[] reasonBytes = reason != null ? reason.getBytes() : new byte[0];
+        int payloadLength = 2 + reasonBytes.length;
+
+        if (payloadLength < 126) {
+            frame.write(payloadLength);
+        } else if (payloadLength < 65536) {
+            frame.write(126);
+            frame.write(payloadLength >> 8);
+            frame.write(payloadLength & 0xFF);
+        }
+
+        frame.write(closeCode >> 8);
+        frame.write(closeCode & 0xFF);
+
+        frame.write(reasonBytes);
+
+        processor.send(ByteBuffer.wrap(frame.toByteArray()));
+        processor.flush();
     }
 }

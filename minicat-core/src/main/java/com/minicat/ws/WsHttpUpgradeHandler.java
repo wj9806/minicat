@@ -6,9 +6,12 @@ import com.minicat.ws.processor.WsProcessor;
 
 import javax.servlet.http.HttpUpgradeHandler;
 import javax.servlet.http.WebConnection;
+import javax.websocket.CloseReason;
 import javax.websocket.Endpoint;
 import javax.websocket.MessageHandler;
 import javax.websocket.server.ServerEndpointConfig;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,8 +59,9 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
         this.endpoint.onOpen(this.session, this.sec);
     }
 
-    public void onClose() {
-        this.endpoint.onClose(this.session, null);
+    public void onClose(CloseReason closeReason) throws IOException {
+        session.sendCloseFrame(closeReason);
+        this.endpoint.onClose(this.session, closeReason);
     }
 
     public void onMessage(byte[] payload) {
@@ -94,4 +98,5 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
             throw new RuntimeException(e);
         }
     }
+
 }

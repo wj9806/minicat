@@ -7,6 +7,7 @@ The features implemented are as follows:
 * Listener
 * Nio/Bio 
 * Http keep-alive
+* WebSocket
 
 The supported ContentTypes are as follows:
 * application/json
