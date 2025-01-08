@@ -42,6 +42,8 @@ public class Config {
 
     private HttpConfig http = new HttpConfig();
 
+    private WebsocketConfig websocket = new WebsocketConfig();
+
     public HttpConfig getHttp() {
         return http;
     }
@@ -56,5 +58,13 @@ public class Config {
 
     public void setServer(ServerConfig server) {
         this.server = server;
+    }
+
+    public WebsocketConfig getWebsocket() {
+        return websocket;
+    }
+
+    public void setWebsocket(WebsocketConfig websocket) {
+        this.websocket = websocket;
     }
 }

@@ -3,6 +3,7 @@ package com.minicat.server;
 import com.minicat.net.Sock;
 import com.minicat.server.config.Config;
 import com.minicat.server.connector.ServerConnector;
+import com.minicat.ws.processor.WsProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,13 @@ public class Monitor implements Runnable {
      * processor是否超时
      */
     private boolean timeout(Sock<?> sock) {
+        if (sock.wsProcessor() != null) {
+            WsProcessor<?> wsProcessor = sock.wsProcessor();
+            return wsProcessor.idleTimeout();
+        }
+
+        if (Config.getInstance().getHttp().getKeepAliveTime() == -1)
+            return false;
         return System.currentTimeMillis() - sock.getLastProcess()
                 > 1000L * Config.getInstance().getHttp().getKeepAliveTime();
     }

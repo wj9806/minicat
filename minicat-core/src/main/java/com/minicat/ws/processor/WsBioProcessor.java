@@ -23,8 +23,4 @@ class WsBioProcessor extends WsProcessor<Socket> {
         return sock.source().getInputStream();
     }
 
-    @Override
-    public void close() throws Exception {
-
-    }
 }

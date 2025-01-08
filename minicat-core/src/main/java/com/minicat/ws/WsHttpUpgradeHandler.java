@@ -10,7 +10,6 @@ import javax.websocket.CloseReason;
 import javax.websocket.Endpoint;
 import javax.websocket.MessageHandler;
 import javax.websocket.server.ServerEndpointConfig;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +32,8 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
 
     private List<BaseMessageHandlerWhole<?>> wholeMessageHandlers;
 
+    private volatile long lastIdleTime;
+
     @Override
     public void init(WebConnection wc) {
         this.processor = (WsProcessor<?>) wc;
@@ -42,6 +43,7 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
         this.wholeMessageHandlers = new ArrayList<>();
         this.initMessageHandlers();
         this.onOpen();
+        this.lastIdleTime = System.currentTimeMillis();
     }
 
     private void initMessageHandlers() {
@@ -61,6 +63,7 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
 
     public void onClose(CloseReason closeReason) throws IOException {
         session.sendCloseFrame(closeReason);
+        processor.sock().setWsProcessor(null);
         this.endpoint.onClose(this.session, closeReason);
     }
 
@@ -88,6 +91,11 @@ public class WsHttpUpgradeHandler implements HttpUpgradeHandler {
 
     public void setServerContainer(WsServerContainer sc) {
         this.sc = sc;
+    }
+
+    public boolean idleTimeout() {
+        if (session.getMaxIdleTimeout() == -1) return false;
+        return System.currentTimeMillis() - lastIdleTime >= session.getMaxIdleTimeout();
     }
 
     @Override

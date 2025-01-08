@@ -1,15 +1,16 @@
 package com.minicat.ws.processor;
 
+import com.minicat.io.SocketChannelInputStream;
 import com.minicat.io.SocketChannelOutputStream;
 import com.minicat.net.Sock;
-import com.minicat.ws.WsHttpUpgradeHandler;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
-/*class WsNioProcessor extends WsProcessor<SelectionKey> {
+class WsNioProcessor extends WsProcessor<SelectionKey> {
 
     WsNioProcessor(Sock<SelectionKey> sock) throws IOException {
         super(sock);
@@ -21,7 +22,7 @@ import java.nio.channels.SocketChannel;
     }
 
     @Override
-    public void close() throws Exception {
-        WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
+    protected InputStream initInputStream() throws IOException {
+        return new SocketChannelInputStream((SocketChannel)sock.source().channel(), 4);
     }
-}*/
+}

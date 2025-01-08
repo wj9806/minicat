@@ -38,7 +38,7 @@ public abstract class Processor<S> implements IProcessor<S>, Lifecycle {
         this.sock = sock;
     }
 
-    protected abstract HttpServletResponse buildResponse();
+    protected abstract HttpServletResponse buildResponse(ApplicationContext applicationContext);
 
     /**
      * 从socket中读取数据到buf中
@@ -74,7 +74,7 @@ public abstract class Processor<S> implements IProcessor<S>, Lifecycle {
         HttpServletRequest servletRequest = null;
         try {
             // 创建Request和Response对象
-            HttpServletResponse servletResponse = buildResponse();
+            HttpServletResponse servletResponse = buildResponse(applicationContext);
             try {
                 servletRequest = buildRequest(sock, applicationContext, servletResponse);
             } catch (SocketCloseException | RequestParseException | SocketException e) {

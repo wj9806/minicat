@@ -5,6 +5,7 @@ import com.minicat.server.IProcessor;
 import com.minicat.ws.WsConstants;
 import com.minicat.ws.WsHttpUpgradeHandler;
 import com.minicat.ws.WsServerContainer;
+import com.minicat.ws.WsSession;
 
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
@@ -26,6 +27,8 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
 
     protected WsServerContainer sc;
 
+    private volatile boolean closed = false;
+
     public WsProcessor(Sock<S> sock) throws IOException {
         this.sock = sock;
         this.os = initOutputStream();
@@ -40,7 +43,8 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
     @Override
     public int process() throws Exception {
         int firstByte = read();
-        if (firstByte == -1) return firstByte;
+        if (firstByte == -1)
+            return firstByte;
 
         int opcode = firstByte & 0x0F;
         int secondByte = read();
@@ -75,6 +79,7 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
         // 处理不同类型的帧
         switch (opcode) {
             case WsConstants.OPCODE_TEXT: // 文本帧
+                sock.freshLastProcess();
                 onMessage(payload);
                 break;
             case WsConstants.OPCODE_CLOSE: // 关闭帧
@@ -109,8 +114,11 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
     }
 
     private void onClose(CloseReason closeReason) throws IOException {
-        WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
-        upgradeHandler.onClose(closeReason);
+        if (!closed) {
+            this.closed = true;
+            WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
+            upgradeHandler.onClose(closeReason);
+        }
     }
 
     protected abstract OutputStream initOutputStream() throws IOException;
@@ -151,10 +159,18 @@ public abstract class WsProcessor<S> implements WebConnection, IProcessor<S> {
         if (source instanceof Socket) {
             return new WsBioProcessor((Sock<Socket>) s);
         } else if (source instanceof SelectionKey) {
-            //return new WsNioProcessor((Sock<SelectionKey>) s);
+            return new WsNioProcessor((Sock<SelectionKey>) s);
         }
         return null;
     }
 
+    @Override
+    public void close() throws Exception {
+        onClose(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, ""));
+    }
 
+    public boolean idleTimeout() {
+        WsHttpUpgradeHandler upgradeHandler = sc.getUpgradeHandler(sock);
+        return upgradeHandler.idleTimeout();
+    }
 }

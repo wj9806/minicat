@@ -163,12 +163,21 @@ public class NioConnector implements ServerConnector<SelectionKey> {
 
             Runnable task = () -> {
                 try (NioProcessor processor = new NioProcessor(applicationContext, fromKey(key))) {
-                    int process = processor.process();
-                    if (process == -1) {
-                        processor.destroy();
+                    Sock<SelectionKey> sock = processor.sock();
+                    if (sock.wsProcessor() == null) {
+                        int process = processor.process();
+                        if (process == -1) {
+                            processor.destroy();
+                            socks.remove(sock);
+                        } else {
+                            socks.add(sock);
+                        }
                     } else {
-                        socks.add(processor.sock());
+                        if (sock.wsProcessor().process() == -1) {
+                            processor.destroy();
+                        }
                     }
+
                 } catch (Exception e) {
                     logger.error("Error processing request", e);
                 } finally {

@@ -12,12 +12,19 @@ class BSock implements Sock<Socket> {
     private long lastProcess;
     private final Socket s;
     private WsProcessor<Socket> p;
+    private final Object lock;
 
     BSock(Socket s) {
         this.r = new InetSocketAddress(s.getInetAddress(), s.getPort());
         this.l = new InetSocketAddress(s.getLocalAddress(), s.getLocalPort());
         this.lastProcess = System.currentTimeMillis();
         this.s = s;
+        this.lock = new Object();
+    }
+
+    @Override
+    public Object sockLock() {
+        return lock;
     }
 
     @Override
@@ -59,8 +66,9 @@ class BSock implements Sock<Socket> {
     public void close() throws Exception {
         if (p != null) {
             p.close();
+        } else {
+            s.close();
         }
-        s.close();
     }
 
     @Override

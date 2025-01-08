@@ -16,6 +16,7 @@ class NSock implements Sock<SelectionKey> {
     private final SocketChannel sc;
     private final SelectionKey key;
     private WsProcessor<SelectionKey> p;
+    private final Object lock;
 
     NSock(SelectionKey key) {
         this.sc = (SocketChannel) key.channel();
@@ -27,6 +28,12 @@ class NSock implements Sock<SelectionKey> {
             throw new RuntimeException(e);
         }
         this.lastProcess = System.currentTimeMillis();
+        this.lock = new Object();
+    }
+
+    @Override
+    public Object sockLock() {
+        return lock;
     }
 
     @Override
@@ -68,10 +75,11 @@ class NSock implements Sock<SelectionKey> {
     public void close() throws Exception {
         if (p != null) {
             p.close();
-        }
-        if (sc.isOpen()) {
-            key.cancel();
-            sc.close();
+        } else {
+            if (sc.isOpen()) {
+                key.cancel();
+                sc.close();
+            }
         }
     }
 

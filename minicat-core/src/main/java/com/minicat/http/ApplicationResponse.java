@@ -1,6 +1,8 @@
 package com.minicat.http;
 
+import com.minicat.core.ApplicationContext;
 import com.minicat.io.ResponseOutputStream;
+import com.minicat.server.config.Config;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
@@ -28,10 +30,12 @@ public class ApplicationResponse implements HttpServletResponse {
     private final HttpHeaders headers = new HttpHeaders();
     private boolean committed = false;
     private int bufferSize = 8192; // 默认8KB缓冲区
+    private final ApplicationContext context;
 
-    public ApplicationResponse(OutputStream socketStream) {
+    public ApplicationResponse(ApplicationContext applicationContext, OutputStream socketStream) {
         this.socketStream = socketStream;
         this.bodyBuffer = new ByteArrayOutputStream(bufferSize);
+        this.context = applicationContext;
     }
 
     private void checkCommitted() {
@@ -387,7 +391,8 @@ public class ApplicationResponse implements HttpServletResponse {
         if (!headers.contains("connection")) {
             headers.set("Connection", "keep-alive");
             if (!headers.contains("keep-alive")) {
-                headers.set("Keep-Alive", "timeout=60");
+                int keepAliveTime = Config.getInstance().getHttp().getKeepAliveTime();
+                headers.set("Keep-Alive", "timeout=" + keepAliveTime);
             }
         }
 

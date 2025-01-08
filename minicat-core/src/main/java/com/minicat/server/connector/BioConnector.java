@@ -57,7 +57,7 @@ public class BioConnector implements ServerConnector<Socket> {
         running = false;
         acceptor.interrupt();
         logger.info("{} stopping...", getName());
-
+        closeSocks();
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
@@ -65,6 +65,12 @@ public class BioConnector implements ServerConnector<Socket> {
                 logger.error("Error closing server socket", e);
                 throw e;
             }
+        }
+    }
+
+    private void closeSocks() throws Exception {
+        for (Sock<Socket> sock : socks) {
+            sock.close();
         }
     }
 
@@ -94,16 +100,18 @@ public class BioConnector implements ServerConnector<Socket> {
     private void handleSocket(Socket socket) {
         Runnable task = () -> {
             BioProcessor processor = null;
+            Sock<Socket> sock = null;
             try {
                 processor = new BioProcessor(applicationContext, Sock.from(socket));
-                Sock<Socket> sock = processor.sock();
+                sock = processor.sock();
                 addSock(sock);
                 while (true) {
                     if (sock.wsProcessor() == null) {
                         if (processor.process() == -1)
                             break;
                     } else {
-                        sock.wsProcessor().process();
+                        if (sock.wsProcessor().process() == -1)
+                            break;
                     }
                 }
                 removeSock(sock);
@@ -111,8 +119,12 @@ public class BioConnector implements ServerConnector<Socket> {
                 logger.error("Error processing request", e);
             } finally {
                 try {
-                    if (processor != null)
+                    if (processor != null) {
                         processor.destroy();
+                    }
+                    if (sock != null) {
+                        removeSock(sock);
+                    }
                 } catch (Exception e) {
                     logger.error("Error closing socket", e);
                 }

@@ -5,7 +5,7 @@ server:
   staticPath:
     - /static
   showBanner: true
-  mode: bio
+  mode: nio
   worker:
     enabled: true
     coreSize: 10
@@ -17,4 +17,7 @@ server:
 
 #Http Configuration
 http:
-  keepAliveTime: 35
+  keepAliveTime: 10
+
+websocket:
+  maxSessionIdleTimeout: -1

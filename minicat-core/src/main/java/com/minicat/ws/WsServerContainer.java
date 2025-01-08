@@ -3,6 +3,8 @@ package com.minicat.ws;
 import com.minicat.http.ApplicationRequest;
 import com.minicat.net.Sock;
 import com.minicat.server.Constants;
+import com.minicat.server.config.Config;
+import com.minicat.server.config.WebsocketConfig;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpUpgradeHandler;
@@ -18,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class WsServerContainer implements ServerContainer {
 
+    private long defaultMaxSessionIdleTimeout = -1;
     private long defaultAsyncTimeout = -1;
     private int maxBinaryMessageBufferSize = 1024 * 1024;
     private int maxTextMessageBufferSize = 1024 * 1024;
@@ -30,6 +33,9 @@ public class WsServerContainer implements ServerContainer {
         this.ctx = ctx;
         this.handlers = new CopyOnWriteArrayList<>();
         this.upgradeHandlerMap = new ConcurrentHashMap<>();
+
+        WebsocketConfig websocketConfig = Config.getInstance().getWebsocket();
+        this.defaultMaxSessionIdleTimeout = websocketConfig.getMaxSessionIdleTimeout();
     }
 
     @Override
@@ -70,12 +76,12 @@ public class WsServerContainer implements ServerContainer {
 
     @Override
     public long getDefaultMaxSessionIdleTimeout() {
-        return defaultAsyncTimeout; // 返回默认的最大会话空闲超时时间
+        return defaultMaxSessionIdleTimeout; // 返回默认的最大会话空闲超时时间
     }
 
     @Override
     public void setDefaultMaxSessionIdleTimeout(long timeout) {
-        this.defaultAsyncTimeout = timeout; // 设置最大会话空闲超时时间
+        this.defaultMaxSessionIdleTimeout = timeout; // 设置最大会话空闲超时时间
     }
 
     @Override

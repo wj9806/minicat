@@ -27,10 +27,10 @@ public class WsSession implements Session {
     private Map<String, String> pathParameters;
     private final Principal userPrincipal;
     private Set<Session> openSessions;
-    private long maxIdleTimeout;
+    private volatile long maxIdleTimeout;
     private int maxBinaryMessageBufferSize;
     private int maxTextMessageBufferSize;
-    private boolean open = true;
+    private volatile boolean open = true;
     private final String negotiatedSubprotocol;
     private List<Extension> negotiatedExtensions;
     private String protocolVersion = "13"; // Default WebSocket protocol version
@@ -52,6 +52,7 @@ public class WsSession implements Session {
         this.requestParameterMap = wsReq.getParameterMap();
         this.pathParameters = wsReq.getPathParams();
         this.negotiatedSubprotocol = null;
+        this.maxIdleTimeout = container.getDefaultMaxSessionIdleTimeout();
 
         Object endpointInstance;
         ServerEndpointConfig.Configurator configurator = sec.getConfigurator();
@@ -164,11 +165,15 @@ public class WsSession implements Session {
 
     @Override
     public RemoteEndpoint.Async getAsyncRemote() {
+        if (!isOpen())
+            throw new IllegalStateException("ws connection is not open");
         return null;
     }
 
     @Override
     public RemoteEndpoint.Basic getBasicRemote() {
+        if (!isOpen())
+            throw new IllegalStateException("ws connection is not open");
         return basicRemote;
     }
 
@@ -179,7 +184,7 @@ public class WsSession implements Session {
 
     @Override
     public void close() throws IOException {
-        this.open = false;
+        close(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, ""));
     }
 
     @Override
@@ -252,5 +257,7 @@ public class WsSession implements Session {
 
         processor.send(ByteBuffer.wrap(frame.toByteArray()));
         processor.flush();
+
+        this.open = false;
     }
 }

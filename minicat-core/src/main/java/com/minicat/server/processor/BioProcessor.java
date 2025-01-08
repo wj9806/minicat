@@ -40,8 +40,8 @@ public class BioProcessor extends Processor<Socket> {
     }
 
     @Override
-    protected HttpServletResponse buildResponse() {
-        return new ApplicationResponse(hos);
+    protected HttpServletResponse buildResponse(ApplicationContext applicationContext) {
+        return new ApplicationResponse(applicationContext, hos);
     }
 
     @Override

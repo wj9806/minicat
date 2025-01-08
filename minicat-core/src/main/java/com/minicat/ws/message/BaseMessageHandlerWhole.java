@@ -49,7 +49,6 @@ public abstract class BaseMessageHandlerWhole<T> implements MessageHandler.Whole
                 parameters[i] = session;
             }
         }
-
         Object ret = null;
         try {
             ret = method.invoke(source, parameters);

@@ -30,8 +30,8 @@ public class NioProcessor extends Processor<SelectionKey> implements AutoCloseab
     }
 
     @Override
-    protected HttpServletResponse buildResponse() {
-        return new ApplicationResponse(hos);
+    protected HttpServletResponse buildResponse(ApplicationContext applicationContext) {
+        return new ApplicationResponse(applicationContext, hos);
     }
 
     @Override

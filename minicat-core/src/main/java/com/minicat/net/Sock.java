@@ -11,6 +11,8 @@ import java.nio.channels.SelectionKey;
  */
 public interface Sock<S> {
 
+    Object sockLock();
+
     InetSocketAddress getRemoteAddress();
 
     InetSocketAddress getLocalAddress();
