@@ -1,4 +1,4 @@
-package com.minicat.test;
+package com.minicat.test.ws;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

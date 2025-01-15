@@ -197,7 +197,9 @@ public class HttpServer implements Lifecycle {
         logger.debug("Adding servlet: name='{}', class='{}', urls='{}'", servletName, className, String.join(",", urls));
 
         // 添加映射
-        registration.addMapping(urls);
+        if (urls.length > 0) {
+            registration.addMapping(urls);
+        }
     }
 
     public void addFilter(Filter filter, String... urls) {

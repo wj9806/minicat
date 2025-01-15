@@ -1,6 +1,7 @@
 package com.minicat.http;
 
 import com.minicat.core.ApplicationContext;
+import com.minicat.io.ResponseBufferWriter;
 import com.minicat.io.ResponseOutputStream;
 import com.minicat.server.config.Config;
 
@@ -8,6 +9,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -17,11 +19,14 @@ public class ApplicationResponse implements HttpServletResponse {
 
     //socket 输出流
     private final OutputStream socketStream;
+
     //响应体缓冲
-    private ByteArrayOutputStream bodyBuffer;
+    private ByteBuffer bodyBuffer;
+    private int bufferSize = 8192; // 默认8KB缓冲区
 
     private PrintWriter writer;
     private ServletOutputStream servletOutputStream;
+    private boolean initial = false;
 
     private Charset charset = StandardCharsets.ISO_8859_1;
     private Locale locale = Locale.getDefault();
@@ -29,12 +34,11 @@ public class ApplicationResponse implements HttpServletResponse {
     private int status = SC_OK;
     private final HttpHeaders headers = new HttpHeaders();
     private boolean committed = false;
-    private int bufferSize = 8192; // 默认8KB缓冲区
     private final ApplicationContext context;
 
     public ApplicationResponse(ApplicationContext applicationContext, OutputStream socketStream) {
         this.socketStream = socketStream;
-        this.bodyBuffer = new ByteArrayOutputStream(bufferSize);
+        this.bodyBuffer = ByteBuffer.allocate(bufferSize);
         this.context = applicationContext;
     }
 
@@ -47,6 +51,23 @@ public class ApplicationResponse implements HttpServletResponse {
     private void writeResponse() throws IOException {
         if (committed) return;
 
+        sendHeader();
+
+        //Write content
+        if (writer != null)
+            writer.flush();
+        else if (servletOutputStream != null)
+            servletOutputStream.flush();
+        else {
+            servletOutputStream = getOutputStream();
+            servletOutputStream.flush();
+        }
+        committed = true;
+    }
+
+    public void sendHeader() throws IOException {
+        if (initial) return;
+
         // Add standard headers
         addStandardHeaders();
 
@@ -55,8 +76,8 @@ public class ApplicationResponse implements HttpServletResponse {
 
         // Write everything at once
         socketStream.write(fullResponse.toByteArray());
-        socketStream.flush();
-        committed = true;
+
+        initial = true;
     }
 
     private ByteArrayOutputStream buildResponse() throws IOException {
@@ -88,10 +109,6 @@ public class ApplicationResponse implements HttpServletResponse {
         // End headers
         fullResponse.write("\r\n".getBytes());
 
-        // Write body
-        if (bodyBuffer.size() > 0) {
-            bodyBuffer.writeTo(fullResponse);
-        }
         return fullResponse;
     }
 
@@ -131,7 +148,7 @@ public class ApplicationResponse implements HttpServletResponse {
     @Override
     public PrintWriter getWriter() throws IOException {
         if (writer == null) {
-            writer = new PrintWriter(new OutputStreamWriter(bodyBuffer, getCharacterEncoding()));
+            writer = new PrintWriter(new ResponseBufferWriter(this));
         }
         return writer;
     }
@@ -139,15 +156,12 @@ public class ApplicationResponse implements HttpServletResponse {
     @Override
     public ServletOutputStream getOutputStream() throws IOException {
         if (servletOutputStream == null)
-            this.servletOutputStream = new ResponseOutputStream(bodyBuffer);
+            this.servletOutputStream = new ResponseOutputStream(this);
         return servletOutputStream;
     }
 
     @Override
     public void flushBuffer() throws IOException {
-        if (writer != null) {
-            writer.flush();
-        }
         writeResponse();
     }
 
@@ -236,7 +250,7 @@ public class ApplicationResponse implements HttpServletResponse {
     @Override
     public void resetBuffer() {
         checkCommitted();
-        bodyBuffer.reset();
+        bodyBuffer.clear();
         if (writer != null) {
             writer = null;
         }
@@ -247,7 +261,7 @@ public class ApplicationResponse implements HttpServletResponse {
         checkCommitted();
         headers.clear();
         status = SC_OK;
-        bodyBuffer.reset();
+        bodyBuffer.clear();
         if (writer != null) {
             writer = null;
         }
@@ -276,11 +290,11 @@ public class ApplicationResponse implements HttpServletResponse {
     @Override
     public void setBufferSize(int size) {
         checkCommitted();
-        if (bodyBuffer.size() > 0) {
+        if (bodyBuffer.position() > 0) {
             throw new IllegalStateException("Cannot set buffer size after data has been written");
         }
         this.bufferSize = size;
-        this.bodyBuffer = new ByteArrayOutputStream(size);
+        this.bodyBuffer = ByteBuffer.allocate(this.bufferSize);
         // 重置输出流
         this.writer = null;
         this.servletOutputStream = null;
@@ -378,13 +392,13 @@ public class ApplicationResponse implements HttpServletResponse {
      * 添加标准HTTP响应头
      */
     private void addStandardHeaders() {
-        if (headers.contains(HttpHeaders.UPGRADE)) {
-            return;
-        }
-
         // Add Date header
         if (!headers.contains("date")) {
             headers.set("Date", formatDate(System.currentTimeMillis()));
+        }
+
+        if (headers.contains(HttpHeaders.UPGRADE)) {
+            return;
         }
 
         // Add Connection and Keep-Alive headers
@@ -398,7 +412,7 @@ public class ApplicationResponse implements HttpServletResponse {
 
         // Set Content-Length if not already set
         if (!headers.contains("content-length")) {
-            setContentLength(bodyBuffer.size());
+            //setContentLength(bodyBuffer.position());
         }
 
         // Set Content-Type if not already set
@@ -420,5 +434,17 @@ public class ApplicationResponse implements HttpServletResponse {
             "EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
         return sdf.format(new Date(timestamp));
+    }
+
+    public Charset getCharset() {
+        return charset;
+    }
+
+    public OutputStream getSocketStream() {
+        return socketStream;
+    }
+
+    public ByteBuffer getBodyBuffer() {
+        return bodyBuffer;
     }
 }

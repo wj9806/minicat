@@ -4,10 +4,7 @@ import com.minicat.MiniCat;
 import com.minicat.server.HttpServer;
 import com.minicat.test.filter.LoggingFilter;
 import com.minicat.test.filter.TestFilter;
-import com.minicat.test.servlet.FormServlet;
-import com.minicat.test.servlet.HelloServlet;
-import com.minicat.test.servlet.JsonServlet;
-import com.minicat.test.servlet.MultipartServlet;
+import com.minicat.test.servlet.*;
 
 public class TestCoreMain {
 
@@ -19,6 +16,7 @@ public class TestCoreMain {
         server.addServlet(new MultipartServlet(), "/file/upload");
         server.addServlet(new HelloServlet(), "/hello.html");
         server.addServlet(new JsonServlet(), "/json", "/json2", "/json/*");
+        server.addServlet(new SseServlet());
 
         server.addFilter(new LoggingFilter(), "/*");
         server.addFilter(new TestFilter(), "/");

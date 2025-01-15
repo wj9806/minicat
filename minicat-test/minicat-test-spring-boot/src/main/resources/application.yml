@@ -1,5 +1,5 @@
 server:
-  port: 8080
-  context-path: /app
+  port: 8081
+  context-path: /
   servlet:
     context-path: ${server.context-path}

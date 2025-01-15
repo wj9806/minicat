@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Client</title>
+    <style>
+        #messages {
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+        .message {
+            padding: 5px;
+            margin: 5px 0;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<h1>Server-Sent Events (SSE) Example</h1>
+<div id="messages"></div>
+
+<script>
+    // 创建 EventSource 实例，连接到服务器的 SSE 接口
+    const eventSource = new EventSource('http://localhost:8080/sse');
+
+    // 当收到消息时处理
+    eventSource.onmessage = function(event) {
+        // 获取消息内容
+        const message = event.data;
+
+        // 将消息显示在页面上
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+        messageDiv.textContent = message;
+
+        // 将消息添加到消息显示区域
+        document.getElementById('messages').appendChild(messageDiv);
+    };
+
+    // 处理错误情况
+    eventSource.onerror = function(error) {
+        console.error('Error with SSE connection:', error);
+        eventSource.close();
+    };
+</script>
+</body>
+</html>
