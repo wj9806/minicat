@@ -5,7 +5,6 @@ import com.minicat.server.IProcessor;
 import com.minicat.ws.WsConstants;
 import com.minicat.ws.WsHttpUpgradeHandler;
 import com.minicat.ws.WsServerContainer;
-import com.minicat.ws.WsSession;
 
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;

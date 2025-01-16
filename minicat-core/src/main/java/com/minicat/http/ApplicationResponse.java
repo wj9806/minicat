@@ -53,15 +53,14 @@ public class ApplicationResponse implements HttpServletResponse {
 
         sendHeader();
 
-        //Write content
+        //do flush
         if (writer != null)
             writer.flush();
         else if (servletOutputStream != null)
             servletOutputStream.flush();
-        else {
-            servletOutputStream = getOutputStream();
-            servletOutputStream.flush();
-        }
+        else
+            socketStream.flush();
+
         committed = true;
     }
 
@@ -411,8 +410,10 @@ public class ApplicationResponse implements HttpServletResponse {
         }
 
         // Set Content-Length if not already set
-        if (!headers.contains("content-length")) {
-            //setContentLength(bodyBuffer.position());
+        String te = getHeader("Transfer-Encoding");
+        boolean chunked = "chunked".equalsIgnoreCase(te);
+        if (!headers.contains("content-length") && !chunked) {
+            setContentLength(bodyBuffer.position());
         }
 
         // Set Content-Type if not already set

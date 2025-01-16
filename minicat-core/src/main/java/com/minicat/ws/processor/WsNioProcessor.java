@@ -23,6 +23,6 @@ class WsNioProcessor extends WsProcessor<SelectionKey> {
 
     @Override
     protected InputStream initInputStream() throws IOException {
-        return new SocketChannelInputStream((SocketChannel)sock.source().channel(), 4);
+        return new SocketChannelInputStream((SocketChannel)sock.source().channel(), 128);
     }
 }

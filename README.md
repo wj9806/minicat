@@ -13,3 +13,4 @@ The supported ContentTypes are as follows:
 * application/json
 * multipart/form-data
 * application/x-www-form-urlencoded
+* text/event-stream
