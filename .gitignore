@@ -4,3 +4,4 @@ target
 logs
 file
 *.iml
+.flattened-pom.xml
