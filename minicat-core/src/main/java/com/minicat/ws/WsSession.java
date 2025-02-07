@@ -68,7 +68,7 @@ public class WsSession implements Session {
             this.endpoint = new EndpointAdapter(handler, endpointInstance);
         }
         this.processor = processor;
-        this.basicRemote = new BasicRemoteEndpoint(processor);
+        this.basicRemote = new BasicRemoteEndpoint(processor, sec.getEncoders());
     }
 
     public Endpoint getEndpoint() {

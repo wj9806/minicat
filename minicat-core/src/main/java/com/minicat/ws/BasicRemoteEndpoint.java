@@ -3,19 +3,41 @@ package com.minicat.ws;
 import com.minicat.ws.processor.WsProcessor;
 
 import javax.websocket.EncodeException;
+import javax.websocket.Encoder;
 import javax.websocket.RemoteEndpoint;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class BasicRemoteEndpoint implements RemoteEndpoint.Basic {
-
     private final WsProcessor<?> processor;
+    private final Map<Class<?>, Encoder> encodersMap;
 
-    public BasicRemoteEndpoint(WsProcessor<?> processor) {
+    public BasicRemoteEndpoint(WsProcessor<?> processor, List<Class<? extends Encoder>> encoderClasses) {
         this.processor = processor;
+        this.encodersMap = new HashMap<>();
+        for (Class<? extends Encoder> encoderClass : encoderClasses) {
+            try {
+                Encoder encoderInstance = encoderClass.getDeclaredConstructor().newInstance();
+                Type genericInterface = encoderClass.getGenericInterfaces()[0];
+                if (genericInterface instanceof ParameterizedType) {
+                    ParameterizedType parameterizedType = (ParameterizedType) genericInterface;
+                    Type actualTypeArgument = parameterizedType.getActualTypeArguments()[0];
+                    if (actualTypeArgument instanceof Class) {
+                        encodersMap.put((Class<?>) actualTypeArgument, encoderInstance);
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create encoder instance for " + encoderClass, e);
+            }
+        }
     }
 
     @Override
@@ -90,7 +112,21 @@ public class BasicRemoteEndpoint implements RemoteEndpoint.Basic {
 
     @Override
     public void sendObject(Object data) throws IOException, EncodeException {
-
+        Class<?> dataClass = data.getClass();
+        Encoder encoder = encodersMap.get(dataClass);
+        if (encoder == null) {
+            throw new EncodeException(data, "No encoder available for the object type");
+        }
+        ByteBuffer buffer;
+        if (encoder instanceof Encoder.Text) {
+            String encodedText = ((Encoder.Text) encoder).encode(data);
+            buffer = ByteBuffer.wrap(encodedText.getBytes(StandardCharsets.UTF_8));
+        } else if (encoder instanceof Encoder.Binary) {
+            buffer = ((Encoder.Binary) encoder).encode(data);
+        } else {
+            throw new EncodeException(data, "Unsupported encoder type");
+        }
+        sendBinary(buffer);
     }
 
     @Override
