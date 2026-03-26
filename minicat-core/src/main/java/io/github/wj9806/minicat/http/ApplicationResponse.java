@@ -413,6 +413,7 @@ public class ApplicationResponse implements HttpServletResponse {
         String te = getHeader("Transfer-Encoding");
         boolean chunked = "chunked".equalsIgnoreCase(te);
         if (!headers.contains("content-length") && !chunked) {
+            // 使用bodyBuffer的position()来获取实际内容长度，因为position()返回的是下一个要写入的位置
             setContentLength(bodyBuffer.position());
         }
 
@@ -447,5 +448,9 @@ public class ApplicationResponse implements HttpServletResponse {
 
     public ByteBuffer getBodyBuffer() {
         return bodyBuffer;
+    }
+
+    public void setBodyBuffer(ByteBuffer buffer) {
+        this.bodyBuffer = buffer;
     }
 }

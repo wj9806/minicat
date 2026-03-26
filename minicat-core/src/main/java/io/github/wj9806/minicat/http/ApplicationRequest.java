@@ -28,10 +28,22 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
 
     private static final Logger logger = LoggerFactory.getLogger(ApplicationRequest.class);
 
+    // Forward attributes
+    public static final String FORWARD_REQUEST_URI = "javax.servlet.forward.request_uri";
+    public static final String FORWARD_SERVLET_PATH = "javax.servlet.forward.servlet_path";
+    public static final String FORWARD_PATH_INFO = "javax.servlet.forward.path_info";
+    public static final String FORWARD_QUERY_STRING = "javax.servlet.forward.query_string";
+
+    // Include attributes
+    public static final String INCLUDE_REQUEST_URI = "javax.servlet.include.request_uri";
+    public static final String INCLUDE_SERVLET_PATH = "javax.servlet.include.servlet_path";
+    public static final String INCLUDE_PATH_INFO = "javax.servlet.include.path_info";
+    public static final String INCLUDE_QUERY_STRING = "javax.servlet.include.query_string";
+
     //basic info
     private final String method;
     private final String protocol;
-    private final String requestURI;
+    private String requestURI;
     private String queryString;
     private final HttpHeaders headers = new HttpHeaders();
     final Map<String, String[]> parameters = new HashMap<>();
@@ -675,8 +687,14 @@ public class ApplicationRequest implements HttpServletRequest, Lifecycle {
         this.remoteUser = remoteUser;
     }
 
+    public void setRequestURI(String requestURI) {
+        this.requestURI = requestURI;
+    }
+
     @Override
-    public RequestDispatcher getRequestDispatcher(String path) { return null; }
+    public RequestDispatcher getRequestDispatcher(String path) {
+        return servletContext.getRequestDispatcher(path);
+    }
 
     @Override
     public String getRealPath(String path) {

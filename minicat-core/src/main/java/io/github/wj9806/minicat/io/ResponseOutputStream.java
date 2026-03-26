@@ -32,6 +32,8 @@ public class ResponseOutputStream extends ServletOutputStream {
         // 确保 ByteBuffer 有足够的空间
         if (byteBuffer.remaining() < 1) {
             byteBuffer = NioUtil.expandBuffer(byteBuffer, 1);
+            // 更新ApplicationResponse中的bodyBuffer引用
+            response.setBodyBuffer(byteBuffer);
         }
         // 写入 ByteBuffer
         byteBuffer.put((byte) b);
@@ -47,12 +49,12 @@ public class ResponseOutputStream extends ServletOutputStream {
         // 确保 ByteBuffer 有足够的空间
         if (byteBuffer.remaining() < len) {
             byteBuffer = NioUtil.expandBuffer(byteBuffer, len - byteBuffer.remaining());
+            // 更新ApplicationResponse中的bodyBuffer引用
+            response.setBodyBuffer(byteBuffer);
         }
 
-        // 将数据写入 ByteBuffer
-        for (int i = off; i < off + len; i++) {
-            byteBuffer.put(b[i]);
-        }
+        // 批量将数据写入 ByteBuffer
+        byteBuffer.put(b, off, len);
 
         // 如果有 WriteListener，通知它
         if (writeListener != null && byteBuffer.hasRemaining()) {
@@ -62,13 +64,14 @@ public class ResponseOutputStream extends ServletOutputStream {
 
     @Override
     public void flush() throws IOException {
-        response.sendHeader();
-
-        // 将 ByteBuffer 中的数据刷新到 OutputStream
-        byteBuffer.flip(); // 切换为读取模式
-        while (byteBuffer.hasRemaining()) {
-            outputStream.write(byteBuffer.get());
+        // 只有在响应未提交时才发送头，避免重复设置Content-Length
+        if (!response.isCommitted()) {
+            response.sendHeader();
         }
+
+        // 将 ByteBuffer 中的数据批量刷新到 OutputStream
+        byteBuffer.flip(); // 切换为读取模式
+        outputStream.write(byteBuffer.array(), byteBuffer.position(), byteBuffer.remaining());
         byteBuffer.clear(); // 清空 ByteBuffer 数据
         outputStream.flush(); // 刷新 OutputStream
     }

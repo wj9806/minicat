@@ -249,8 +249,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
 
     @Override
     public RequestDispatcher getRequestDispatcher(String path) {
-        // TODO: 实现请求转发
-        return null;
+        return new io.github.wj9806.minicat.http.ApplicationRequestDispatcher(this, path);
     }
 
     @Override
@@ -432,6 +431,11 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate servlet: " + servletClass.getName(), e);
         }
+    }
+
+    @Override
+    public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
+        return null;
     }
 
     @Override
@@ -647,6 +651,36 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
     }
 
     @Override
+    public int getSessionTimeout() {
+        return 0;
+    }
+
+    @Override
+    public void setSessionTimeout(int sessionTimeout) {
+
+    }
+
+    @Override
+    public String getRequestCharacterEncoding() {
+        return "";
+    }
+
+    @Override
+    public void setRequestCharacterEncoding(String encoding) {
+
+    }
+
+    @Override
+    public String getResponseCharacterEncoding() {
+        return "";
+    }
+
+    @Override
+    public void setResponseCharacterEncoding(String encoding) {
+
+    }
+
+    @Override
     public void addServletMapping(String servletName, String urlPattern) {
         servletUrlPatterns.put(urlPattern, servletName);
     }
@@ -788,7 +822,7 @@ public class ApplicationContext implements javax.servlet.ServletContext, Applica
         }
     }
 
-    private void initServlet(ServletRegistrationImpl registration) throws ServletException {
+    private synchronized void initServlet(ServletRegistrationImpl registration) throws ServletException {
         if (!registration.isLoaded()) {
             Servlet servlet = registration.getServlet();
             servlet.init(registration.getServletConfig());
